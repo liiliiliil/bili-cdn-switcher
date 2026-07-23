@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>B站 CDN Switcher</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">BILIBILI ONLY</div>
+          <h1>CDN Switcher</h1>
+        </div>
+        <label class="switch" title="启用或停用">
+          <input id="enabled" type="checkbox" aria-label="启用 CDN 切换">
+          <span class="slider"></span>
+        </label>
+      </header>
+
+      <section id="scopeNotice" class="notice hidden"></section>
+      <section id="message" class="notice hidden" role="status"></section>
+
+      <section class="status-card">
+        <div class="status-line">
+          <span id="statusDot" class="dot"></span>
+          <strong id="statusText">读取状态…</strong>
+        </div>
+        <dl>
+          <div>
+            <dt>当前观测</dt>
+            <dd id="observedHost">尚未捕获</dd>
+          </div>
+          <div>
+            <dt>重定向到</dt>
+            <dd id="activeHost">未启用</dd>
+          </div>
+          <div>
+            <dt>自动恢复</dt>
+            <dd id="recoveryStatus">尚未触发</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <h2>选择方式</h2>
+          <button id="benchmarkAll" class="text-button" type="button">重新优选</button>
+        </div>
+        <div class="mode-tabs" role="group" aria-label="选择模式">
+          <button id="autoMode" type="button" data-mode="auto">自动选择</button>
+          <button id="manualMode" type="button" data-mode="manual">手动选择</button>
+        </div>
+        <p id="benchmarkHint" class="hint">每轮最多测试 8 个候选，每个读取最多 256 KB。</p>
+        <p id="bandwidthNotice" class="notice warning hidden"></p>
+      </section>
+
+      <section>
+        <div id="candidateList" class="candidate-list" aria-live="polite"></div>
+      </section>
+
+      <details>
+        <summary>添加自定义 bilivideo.com 节点</summary>
+        <form id="customForm">
+          <input
+            id="customHost"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="例如 upos-sz-….bilivideo.com"
+          >
+          <button type="submit">添加</button>
+        </form>
+      </details>
+
+      <footer>
+        <span>不使用全局代理 · 不上传数据 · <b id="version">v—</b></span>
+        <a href="../README.md" target="_blank">说明</a>
+      </footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement within the extension's Bilibili CDN optimization purpose.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user-visible problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This stays within local Bilibili on-demand video CDN optimization.
+          required: true

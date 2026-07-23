@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "B站 CDN Switcher",
+  "version": "1.6.0",
+  "description": "仅在活动的 B 站播放标签页内学习、持续测速并在卡顿时切换 bilivideo.com 媒体 CDN。",
+  "homepage_url": "https://github.com/liiliiliil/bili-cdn-switcher",
+  "minimum_chrome_version": "111",
+  "permissions": [
+    "activeTab",
+    "declarativeNetRequest",
+    "storage",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://bilibili.com/*",
+    "https://*.bilibili.com/*",
+    "https://*.bilivideo.com/*"
+  ],
+  "background": {
+    "service_worker": "src/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "B站 CDN Switcher",
+    "default_popup": "src/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.bilibili.com/video/*",
+        "https://www.bilibili.com/bangumi/play/*",
+        "https://www.bilibili.com/cheese/play/*",
+        "https://m.bilibili.com/video/*",
+        "https://m.bilibili.com/bangumi/play/*"
+      ],
+      "js": [
+        "src/page-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.bilibili.com/video/*",
+        "https://www.bilibili.com/bangumi/play/*",
+        "https://www.bilibili.com/cheese/play/*",
+        "https://m.bilibili.com/video/*",
+        "https://m.bilibili.com/bangumi/play/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

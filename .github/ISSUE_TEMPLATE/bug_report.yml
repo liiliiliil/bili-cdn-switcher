@@ -1,0 +1,48 @@
+name: Bug report
+description: Report incorrect CDN observation, benchmarking, switching or recovery behavior.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste complete signed media URLs, cookies or account information.
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      placeholder: v1.6.0
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 145
+    validations:
+      required: true
+  - type: input
+    id: region
+    attributes:
+      label: Broad region (optional)
+      placeholder: Country or broad region only
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include the video ID, selected quality and expected behavior when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: CDN hosts, benchmark summary and recovery count are useful. Remove URL paths, query strings and signatures.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed cookies, signatures, complete media URLs and private account data.
+          required: true
