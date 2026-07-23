@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280">
+  <defs>
+    <linearGradient id="bg" x1="98" y1="41" x2="1201" y2="739" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3F8FA"/>
+      <stop offset="1" stop-color="#DDF5FA"/>
+    </linearGradient>
+    <filter id="shadow" x="54" y="58" width="676" height="692" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#1E526A" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Square render canvas: crop the centered 1280×800 area after PNG export. -->
+  <g transform="translate(0 240)">
+  <rect width="1280" height="800" fill="url(#bg)"/>
+  <circle cx="1194" cy="84" r="244" fill="#00A1D6" opacity="0.08"/>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="82" width="604" height="632" rx="28" fill="#FFFFFF"/>
+  </g>
+
+  <g transform="translate(130 126)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="0" y="0" fill="#00A1D6" font-size="15" font-weight="800" letter-spacing="2">自动重新优选</text>
+    <text x="0" y="58" fill="#17212B" font-size="38" font-weight="800">按你的观看习惯来</text>
+    <text x="0" y="96" fill="#60717D" font-size="18">默认“平衡”已经够用，也可以随时调整。</text>
+
+    <g transform="translate(0 142)">
+      <rect width="524" height="86" rx="14" fill="#F3FBFD" stroke="#BDEAF5"/>
+      <circle cx="32" cy="43" r="18" fill="#DFF8FD"/>
+      <path d="M26 43H38M32 37V49" stroke="#008BB8" stroke-width="3" stroke-linecap="round"/>
+      <text x="66" y="35" fill="#17212B" font-size="16" font-weight="750">积极 · 30 分钟</text>
+      <text x="66" y="61" fill="#6D7D87" font-size="13">网络变化较快时，更早按需复测</text>
+    </g>
+
+    <g transform="translate(0 242)">
+      <rect width="524" height="86" rx="14" fill="#EAF9F3" stroke="#98DFC3" stroke-width="2"/>
+      <circle cx="32" cy="43" r="18" fill="#CFF2E3"/>
+      <path d="M24 43L30 49L41 36" fill="none" stroke="#168957" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="66" y="35" fill="#17212B" font-size="16" font-weight="750">平衡 · 90 分钟（默认）</text>
+      <text x="66" y="61" fill="#567468" font-size="13">兼顾响应速度与额外流量</text>
+    </g>
+
+    <g transform="translate(0 342)">
+      <rect width="524" height="86" rx="14" fill="#F8FAFB" stroke="#DDE6EA"/>
+      <circle cx="32" cy="43" r="18" fill="#EDF1F3"/>
+      <path d="M25 43H39" stroke="#71818B" stroke-width="3" stroke-linecap="round"/>
+      <text x="66" y="35" fill="#17212B" font-size="16" font-weight="750">低频 · 6 小时</text>
+      <text x="66" y="61" fill="#6D7D87" font-size="13">路径比较稳定时，减少自动复测</text>
+    </g>
+
+    <text x="0" y="476" fill="#84909A" font-size="13">三档都不会在后台定时跑，也不会因为只开着 B 站页面就测速。</text>
+  </g>
+
+  <g transform="translate(780 144)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="0" y="0" fill="#007DA7" font-size="15" font-weight="800" letter-spacing="2">作用范围</text>
+    <text x="0" y="62" fill="#17212B" font-size="42" font-weight="800">管得少，</text>
+    <text x="0" y="116" fill="#17212B" font-size="42" font-weight="800">也说得清楚。</text>
+
+    <g transform="translate(0 170)">
+      <rect width="384" height="74" rx="14" fill="#FFFFFF" stroke="#CFE6ED"/>
+      <circle cx="32" cy="37" r="10" fill="#19B46B"/>
+      <text x="58" y="33" fill="#17212B" font-size="16" font-weight="750">B 站点播页</text>
+      <text x="58" y="53" fill="#75838C" font-size="12">视频、番剧与课程播放路径</text>
+    </g>
+
+    <g transform="translate(0 260)">
+      <rect width="384" height="74" rx="14" fill="#FFFFFF" stroke="#CFE6ED"/>
+      <circle cx="32" cy="37" r="10" fill="#19B46B"/>
+      <text x="58" y="33" fill="#17212B" font-size="16" font-weight="750">bilivideo.com 媒体</text>
+      <text x="58" y="53" fill="#75838C" font-size="12">观察、测速与受限 host 切换</text>
+    </g>
+
+    <g transform="translate(0 350)">
+      <rect width="384" height="74" rx="14" fill="#FFFFFF" stroke="#CFE6ED"/>
+      <circle cx="32" cy="37" r="10" fill="#00A1D6"/>
+      <text x="58" y="33" fill="#17212B" font-size="16" font-weight="750">本地保存</text>
+      <text x="58" y="53" fill="#75838C" font-size="12">无开发者服务器、无广告、无遥测</text>
+    </g>
+
+    <text x="0" y="488" fill="#60717D" font-size="14">不处理直播，也不修改其他网站的请求。</text>
+    <text x="0" y="522" fill="#00A1D6" font-size="14" font-weight="750">开关一直在你手里。</text>
+  </g>
+
+  <text x="1248" y="776" text-anchor="end" fill="#79919E" font-size="12" font-family="Inter, sans-serif">功能说明图 · 不含真实视频或账号信息</text>
+  </g>
+</svg>

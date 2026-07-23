@@ -1,125 +1,104 @@
+<p align="center">
+  <img src="assets/icons/icon-128.png" width="96" height="96" alt="Bili CDN Switcher icon">
+</p>
+
 # Bili CDN Switcher / B站视频 CDN 优选器
 
 [![CI](https://github.com/liiliiliil/bili-cdn-switcher/actions/workflows/ci.yml/badge.svg)](https://github.com/liiliiliil/bili-cdn-switcher/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chromium-Manifest%20V3-4285F4.svg)](manifest.json)
 
-一个保守、无代理、无遥测的 Chromium Manifest V3 扩展。它只在 B 站视频/番剧/课程播放标签页里观测 `bilivideo.com` 媒体请求，并可把后续媒体请求的 host 换成测速更好的候选节点。
+我做这个扩展的原因很简单：人在海外时，明明其他网站都挺快，B 站视频却偶尔卡得让人怀疑人生。
 
-这是非官方开源项目，与哔哩哔哩不存在隶属、授权或背书关系。“哔哩哔哩”“Bilibili”等名称与标识的权利归其各自权利人所有。
+Bili CDN Switcher 会在当前视频可用的 `bilivideo.com` 地址中做一轮本地测速，再为这个播放标签页选择更合适的 CDN。它不需要全局代理，不会接管其他网站，测速结果也不会上传。
 
-当前候选版本：**v1.7.0-rc.1**。弹窗底部会显示版本号；内容脚本加载后，还会在页面根元素写入版本、启停、模式、目标 host、当前发现数、学习数、测速阶段、自动结果状态、自动复测档位、自动恢复次数等本地诊断标记，方便确认解压扩展是否已重新加载和建立规则。这些标记不包含完整媒体 URL、签名或用户数据，也不会上传。
+![扩展界面与核心功能](assets/store/screenshot-01-overview-1280x800.png)
 
-## 它能做什么
-
-- 记录当前播放标签页实际使用的媒体 CDN host。
-- 只读观察 B 站 `playurl` 响应，优先使用其中刚签发的 `baseUrl` / `backupUrl` 作为候选，不改写响应内容。
-- 使用当前视频的有效媒体 URL 和播放器正在请求的真实字节位置，先以 128 KB 初筛最多 8 个候选，再以不同字节区间对最快的 3 个各读取最多 1 MB，复测持续吞吐。
-- 自动选择通过持续复测的最佳节点；弹窗会把只做过初筛和做过持续复测的结果分开标明，也可手动选择。
-- 自动模式下，播放器连续约 4.5 秒没有可播放缓冲时，会给当前节点记录一次真实卡顿、切换到下一可用候选，并轻微回退 0.15 秒促使播放器发起新请求。每次恢复至少间隔 15 秒。
-- 播放、拖动进度条或完成跳转后也会主动安排一次缓冲检查，避免只依赖可能早于内容脚本触发的 `waiting` / `stalled` 事件。
-- 动态学习近期真实出现且可用的 host；最多保留 24 个、30 天自动过期、连续失败会降低优先级。
-- 每轮总测速流量上限约 4 MB。自动重新优选可选“积极（30 分钟/1 小时）”“平衡（90 分钟/2 小时，默认）”或“低频（6 小时/12 小时）”三档，前一个时间表示开始按需复测，后一个时间表示结果硬过期。
-- 无论选择哪一档，软过期后的复测都只会在播放页可见、视频正在播放、确有媒体 Range 请求且已有节点的缓冲不少于 10 秒时触发。
-- 没有后台定时测速，也没有申请 `alarms` 权限；仅仅开着 B 站首页、动态页、直播页、隐藏或暂停的点播页不会触发复测。多个标签页共用一个自动测速锁。
-- 不把带 `os=mcdn`、非标准端口、明显 302 跳转或已知 PCDN 特征的地址加入候选池。
-- 每个标签页使用独立的 Chrome 会话规则；离开播放页、关闭标签页、停用扩展或结束浏览器会话时移除/失效。
-- 同一视频 URL 新增或移除 `spm_id_from`、`vd_source` 等追踪参数时会保留已观测状态；真正切换 BV、分 P（`p`）、CID 或番剧身份参数时才重置。
-- 不需要全局 proxy，也没有申请 Chrome 的 `proxy` 权限。
+当前版本：**v1.7.0**。Chrome Web Store 版本和正式 Release 仍在准备中，目前需要用开发者模式安装。
 
 ## 安装
 
-1. 解压 ZIP。
-2. 在 Chrome、Edge、Brave 等 Chromium 浏览器打开扩展管理页：
-   - Chrome：`chrome://extensions`
-   - Edge：`edge://extensions`
-3. 打开右上角的“开发者模式”。
-4. 点击“加载已解压的扩展程序”，选择包含 `manifest.json` 的 `bilibili-cdn-switcher` 文件夹。
-5. 把扩展固定到工具栏。
+1. 在 GitHub 仓库右上角点击 **Code → Download ZIP**，然后解压。
+2. 打开 `chrome://extensions`；Edge 用户打开 `edge://extensions`。
+3. 开启“开发者模式”，点击“加载已解压的扩展程序”。
+4. 选择包含 `manifest.json` 的文件夹，建议顺手把扩展固定到工具栏。
 
 ## 使用
 
-1. 打开一个 B 站视频并开始播放几秒。
-2. 点击工具栏中的“B站 CDN Switcher”。
-3. 打开启停开关。
-4. 保持“自动选择”时，扩展会在捕获到媒体 URL 后从“当前实际 host、当前播放接口签发 host、自定义项、少量核心种子、近期成功项”中挑最多 8 个初筛，再持续复测前 3 个，并为这个标签页选择表现最好的成功项；也可以切到“手动选择”并选择一个 host。
-5. “自动重新优选”默认使用平衡档；网络路径变化较快时可选积极档，希望降低自动复测频率时可选低频档。
-6. 自动模式检测到真实卡顿后会轮换下一候选。若所有候选都慢，弹窗会提示当前持续带宽可能不足；此时降低清晰度通常比继续换 host 更有效。
+1. 打开一个 B 站视频并播放几秒。
+2. 点击扩展图标，确认右上角开关已开启。
+3. 保持“自动选择”即可；也可以切到手动模式指定候选节点。
 
-测速结果只代表这一个视频、这一时刻和这一条网络路径。CDN 的 DNS、缓存和跨境路由会变化，今天最快的节点不保证明天仍然最快。
+弹窗里出现“当前观测”、候选测速结果和“重定向到”的节点，就说明扩展已经开始工作。重新加载扩展后，记得刷新原来的视频页。
 
-## 验证与研究
+### 自动重新优选
 
-项目在真实 Chromium 会话中完成了多轮两阶段测速、持续播放、自动恢复和未缓存位置跳转回归。公开材料经过匿名化，不包含测试视频 ID、标题、UP 主、账号标识、个人空间或完整媒体 URL。
+| 档位 | 开始按需复测 | 结果硬过期 | 适合 |
+| --- | ---: | ---: | --- |
+| 积极 | 30 分钟 | 1 小时 | 网络路径变化较快 |
+| 平衡（默认） | 90 分钟 | 2 小时 | 大多数情况 |
+| 低频 | 6 小时 | 12 小时 | 路径比较稳定 |
 
-- [匿名浏览器测试报告](docs/testing/browser-test-report-2026-07-23.md)：测速、恢复、随机跳转和 v1.6.0 活动门槛。
-- [B站“4K”画质研究](docs/research/bilibili-4k-quality-2026-07-23.md)：实际解码分辨率、码率与有限跨平台对照。
-- [文档索引](docs/README.md)：文档分类及公开信息边界。
+复测只会在可见的视频页正在播放、确实有媒体请求且缓冲充足时发生。只开着首页、动态页、直播页或暂停的视频，不会在后台偷偷测速。
 
-## 工作原理与 MV3 取舍
+## 它会做什么
 
-普通 MV3 扩展不能再使用 `webRequestBlocking` 同步改写请求。因此本项目把能力拆开：
+- 识别当前视频实际签发和使用的媒体 CDN。
+- 先快速初筛，再持续复测较快的候选。
+- 自动选择结果最好的节点，也支持手动切换。
+- 播放持续卡住时，在自动模式下尝试下一个可用候选。
+- 给每个播放标签页建立独立的临时规则；关闭标签页或停用扩展后失效。
+- 在本机记住近期遇到的有效 host，同时让长期失败的候选自然退出。
 
-1. `webRequest` 仅观察由 B 站发起的 `bilivideo.com` 请求，记录播放器当前的 Range，并保存本地状态。
-2. 一个运行在页面主世界的最小只读观察器会克隆并解析 B 站 `playurl` 的 fetch/XHR 响应，以及页面已有的 `window.__playinfo__`。它只提取通过白名单校验的 `*.bilivideo.com` 媒体 URL，不修改播放器对象或网络响应。
-3. 两阶段测速在 B 站播放页的隔离内容脚本中进行，以使用与播放器相同的页面来源与 Referer 环境；第二阶段换一个相邻 Range，避免重复读取浏览器缓存。测速结果只返回扩展后台。
-4. `declarativeNetRequest.updateSessionRules()` 建立会话级重定向规则。
-5. 内容脚本只监听播放器的 `waiting` / `stalled` 等本地媒体状态；确认不是暂停、页面不可见或仍有缓冲后，才请求后台轮换一次节点。
-6. 规则同时要求：
-   - 请求来自特定 B 站播放标签页的 `tabId`；
-   - initiator 属于 `bilibili.com`；
-   - 目标属于 `bilivideo.com`；
-   - 类型为 `media`、`xmlhttprequest` 或 `other`；
-   - 只把 scheme/host 换成经校验的 `*.bilivideo.com`，原路径、查询参数和签名保持不变。
+## 权限与隐私
 
-声明式规则会在浏览器网络层覆盖媒体元素、XHR、fetch、普通 Worker 和播放器内部加载器发出的匹配请求。因此，本项目不需要把替换逻辑注入 Worker，也不需要申请 `webRequestBlocking`；页面主世界的 hook 只用于观察 `playurl` 返回了哪些现成签名地址。
+| 权限 | 用途 |
+| --- | --- |
+| `declarativeNetRequestWithHostAccess` | 为当前播放标签页建立受限的 CDN host 替换规则 |
+| `webRequest` | 只读观察 B 站媒体请求及其完成状态 |
+| `storage` | 在本机保存开关、候选 host 和有上限的测速摘要 |
+| `activeTab` | 点击弹窗时判断当前标签页是否受支持 |
+| `bilibili.com` / `bilivideo.com` | 仅覆盖支持的点播页与 B 站媒体 CDN |
 
-## 权限说明
+扩展没有 `proxy`、Cookie、历史记录或 `<all_urls>` 权限，也不包含遥测、广告、远程代码或开发者服务器。完整说明见 [PRIVACY.md](PRIVACY.md)。
 
-- `declarativeNetRequestWithHostAccess`：为当前 B 站播放标签页建立受限的 CDN host 替换规则；它与普通 DNR 能力相同，但依赖下列明确 host 权限，不额外产生“可拦截所有页面内容”的权限提示。
-- `webRequest`：只读观测 `bilivideo.com` 媒体请求、完成状态和错误。
-- `storage`：在本机保存开关、模式、候选 host 和有数量/期限上限的测速摘要。
-- `activeTab`：弹窗读取用户刚刚点击的当前标签页。
-- `https://www.bilibili.com/*` / `https://m.bilibili.com/*`：只覆盖当前支持的桌面和移动播放页。
-- `https://*.bilivideo.com/*`：观察、测速和切换 B 站媒体 CDN。
+## 已知限制
 
-没有 `<all_urls>`、`proxy`、Cookie、历史记录或远程代码权限。详见 [PRIVACY.md](PRIVACY.md)。
+- 它不是 VPN，不能绕过地区版权、登录限制或失效的媒体签名。
+- 当前只处理 `bilivideo.com` 点播媒体，不处理直播、`akamaized.net`、`bilivideo.cn` 或非 B 站请求。
+- 部分版权内容或运营商节点会把签名绑定到特定 host，因而无法互换。
+- CDN 缓存和跨境路由会变化；这个视频此刻最快的节点，不保证一直最快。
+- 已经开始的单个请求不能半途换线。卡顿恢复时可能轻微回退播放位置。
+- 如果所有节点的持续带宽都不够，降低清晰度通常比继续换 host 更有效。
 
-## 限制
+## 工作原理
 
-- 这不是 VPN，也不会建立任何隧道；它不能绕过地区版权限制、登录限制或已经失效的媒体签名。
-- host 替换依赖不同 B 站 CDN 接受同一条已签名路径。某些视频、版权内容、运营商专用节点或未来的 URL 格式可能不兼容。
-- 页面测速可能因节点拒绝跨域请求、签名绑定 host、防盗链或网络错误失败。失败项不会被自动选择；扩展会优先测试 B 站原样签发的地址，只有没有对应签发地址时才做 host 替换测试。
-- 已经开始的单个网络请求不能“半途换线”；自动恢复会在换规则后把播放位置回退约 0.15 秒，以触发后续请求，画面可能出现几乎不可察觉的重复。
-- 当前版本严格限制为 `bilivideo.com`，不会改写 `akamaized.net`、`bilivideo.cn`、直播流或非 B 站请求。
+扩展只读观察当前视频的媒体地址，在播放页本地测速，然后通过 Manifest V3 的标签页会话规则替换后续请求的 scheme/host。原路径、查询参数和签名保持不变。
 
-## 候选节点
+候选来源、测速上限、自动恢复、防抖和规则边界都写在 [工作原理与安全边界](docs/architecture.md)；确认版本、规则和测速状态的方法见 [排障指南](docs/troubleshooting.md)。
 
-内置列表现在只是一个很小的冷启动种子，不再被当作长期真值。除常见 mirror 节点外，v1.5 加入了仍被其他开源加速器使用的 `upos-tf-all-hw` / `upos-tf-all-tx` 通用 UPOS 种子。扩展会把“当前视频实际请求的 host”和“当前 `playurl` 原样签发的 host”排在前面，再参考本机近期成功记录；每轮测试数固定封顶，过期、长期失败或真实播放中卡顿的项会被降权或淘汰。这样新 host 可以自动进入候选，但列表不会无限膨胀，也不会让每次播放越来越慢。
+## 文档与测试
 
-你可以添加自定义 host，但安全校验只接受 `*.bilivideo.com`，不接受协议、路径、端口或其他域名。
+- [浏览器实测报告](docs/testing/browser-test-report-2026-07-23.md)
+- [B站“4K”画质研究](docs/research/bilibili-4k-quality-2026-07-23.md)
+- [Chrome Web Store 发布准备](docs/release/README.md)
+- [文档索引与公开信息边界](docs/README.md)
 
-## 开发与检查
+公开测试材料已匿名化，不包含测试视频、账号或完整媒体 URL。
 
-需要 Node.js 18 或更新版本：
+## 开发
+
+需要 Node.js 18 或更新版本。项目没有打包构建步骤，源码就是扩展本体。
 
 ```bash
 npm test
 npm run check
 ```
 
-测试覆盖 host 白名单、URL 替换、播放页作用域、动态候选排序与数量上限、两阶段结果优先级、卡顿候选轮换、自动切换防抖、会话规则约束和 Manifest 权限边界。
+有问题或想法可以开 [Issue](https://github.com/liiliiliil/bili-cdn-switcher/issues)。参与开发前请看 [CONTRIBUTING.md](CONTRIBUTING.md)；安全问题请按 [SECURITY.md](SECURITY.md) 提交。
 
-欢迎通过 [Issues](https://github.com/liiliiliil/bili-cdn-switcher/issues) 报告问题或建议功能。参与开发前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 的说明提交。版本变化记录见 [CHANGELOG.md](CHANGELOG.md)。
+## 项目说明
 
-## 参考
+这是一个非官方开源项目，与哔哩哔哩不存在隶属、授权或背书关系。“哔哩哔哩”“Bilibili”等名称与标识的权利归其各自权利人所有。
 
-- [Chrome declarativeNetRequest API](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest)
-- [Chrome webRequest API](https://developer.chrome.com/docs/extensions/reference/api/webRequest)
-- [Chrome Content scripts 与 MAIN/ISOLATED world](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
-- [Bilibili Video CDN Switcher 候选 host 与使用说明](https://greasyfork.org/en/scripts/500213-bilibili-video-cdn-switcher)
-- [BiliCDN Pilot 的动态学习、有限测速与 Worker 兼容思路](https://github.com/zzvsjs1/BiliCDN-Pilot)
-- [Bilibili Accelerator 的通用 UPOS 候选、卡顿恢复和主动传输测速思路](https://github.com/realzza/bilibili-accelerator)
-- [Bilibili-Evolved 的媒体 URL 类型识别](https://github.com/the1812/Bilibili-Evolved/blob/master/registry/lib/components/video/download/url-type.ts)
-
-本项目代码为独立实现，没有复制上述用户脚本代码；扩展使用浏览器网络层规则覆盖 Worker，而不是采用用户脚本的 Worker 源码注入方案。
+实现过程中参考了 [Bilibili Video CDN Switcher](https://greasyfork.org/en/scripts/500213-bilibili-video-cdn-switcher)、[BiliCDN Pilot](https://github.com/zzvsjs1/BiliCDN-Pilot)、[Bilibili Accelerator](https://github.com/realzza/bilibili-accelerator) 和 [Bilibili-Evolved](https://github.com/the1812/Bilibili-Evolved)。本项目为独立实现，采用 [MIT License](LICENSE)。
