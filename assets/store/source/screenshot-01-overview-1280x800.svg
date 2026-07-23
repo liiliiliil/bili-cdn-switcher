@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280">
+  <defs>
+    <linearGradient id="bg" x1="41" y1="37" x2="1218" y2="768" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#102D45"/>
+      <stop offset="0.54" stop-color="#087A9F"/>
+      <stop offset="1" stop-color="#00B8D9"/>
+    </linearGradient>
+    <filter id="panel-shadow" x="662" y="13" width="526" height="780" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#062238" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Square render canvas: crop the centered 1280×800 area after PNG export. -->
+  <g transform="translate(0 240)">
+  <rect width="1280" height="800" fill="url(#bg)"/>
+  <circle cx="108" cy="705" r="270" fill="#5BE0F5" opacity="0.09"/>
+  <circle cx="1132" cy="48" r="210" fill="#B8F5FF" opacity="0.11"/>
+
+  <g transform="translate(86 98)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="0" y="0" fill="#B8F5FF" font-size="18" font-weight="800" letter-spacing="3">BILI CDN SWITCHER</text>
+    <text x="0" y="86" fill="#FFFFFF" font-size="58" font-weight="800">给 B 站视频</text>
+    <text x="0" y="154" fill="#FFFFFF" font-size="58" font-weight="800">挑一条更顺的路</text>
+    <text x="0" y="216" fill="#D8F8FF" font-size="24">本地测速、自动切换，不需要全局代理。</text>
+
+    <g transform="translate(0 286)" fill="#FFFFFF">
+      <circle cx="10" cy="10" r="10" fill="#60E4B3"/>
+      <path d="M5 10L9 14L16 6" fill="none" stroke="#0D6046" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="38" y="18" font-size="22" font-weight="650">只处理 B 站点播媒体请求</text>
+
+      <circle cx="10" cy="72" r="10" fill="#60E4B3"/>
+      <path d="M5 72L9 76L16 68" fill="none" stroke="#0D6046" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="38" y="80" font-size="22" font-weight="650">测速结果和设置都留在本机</text>
+
+      <circle cx="10" cy="134" r="10" fill="#60E4B3"/>
+      <path d="M5 134L9 138L16 130" fill="none" stroke="#0D6046" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="38" y="142" font-size="22" font-weight="650">自动选择，也保留手动控制</text>
+    </g>
+
+    <text x="0" y="574" fill="#B8F5FF" font-size="16">非官方开源扩展 · 不含广告和遥测</text>
+  </g>
+
+  <g filter="url(#panel-shadow)">
+    <rect x="698" y="38" width="454" height="724" rx="28" fill="#F5F8FA"/>
+  </g>
+
+  <g transform="translate(724 66)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="0" y="14" fill="#00A1D6" font-size="11" font-weight="800" letter-spacing="2">BILIBILI ONLY</text>
+    <text x="0" y="45" fill="#17212B" font-size="27" font-weight="800">CDN Switcher</text>
+
+    <rect x="347" y="3" width="52" height="30" rx="15" fill="#00A1D6"/>
+    <circle cx="384" cy="18" r="12" fill="#FFFFFF"/>
+
+    <rect x="0" y="72" width="402" height="151" rx="16" fill="#FFFFFF" stroke="#DFE7ED"/>
+    <circle cx="18" cy="94" r="6" fill="#19B46B"/>
+    <text x="33" y="99" fill="#17212B" font-size="14" font-weight="750">自动模式运行中</text>
+    <text x="18" y="132" fill="#7A8792" font-size="11">当前观测</text>
+    <text x="108" y="132" fill="#52616C" font-size="11" font-family="ui-monospace, Menlo, monospace">upos-example-a.bilivideo.com</text>
+    <text x="18" y="163" fill="#7A8792" font-size="11">重定向到</text>
+    <text x="108" y="163" fill="#168957" font-size="11" font-family="ui-monospace, Menlo, monospace">upos-example-b.bilivideo.com</text>
+    <text x="18" y="194" fill="#7A8792" font-size="11">自动恢复</text>
+    <text x="108" y="194" fill="#52616C" font-size="11">尚未触发</text>
+
+    <text x="0" y="256" fill="#17212B" font-size="14" font-weight="750">选择方式</text>
+    <text x="332" y="256" fill="#00A1D6" font-size="12" font-weight="750">重新优选</text>
+
+    <rect x="0" y="270" width="402" height="42" rx="11" fill="#E8EEF2"/>
+    <rect x="4" y="274" width="195" height="34" rx="9" fill="#FFFFFF"/>
+    <text x="69" y="296" fill="#007DA7" font-size="12" font-weight="750">自动选择</text>
+    <text x="271" y="296" fill="#5B6873" font-size="12" font-weight="700">手动选择</text>
+
+    <rect x="0" y="324" width="402" height="50" rx="11" fill="#FFFFFF" stroke="#DFE7ED"/>
+    <text x="12" y="345" fill="#52616C" font-size="11" font-weight="750">自动重新优选</text>
+    <text x="12" y="362" fill="#8A959D" font-size="9">只在可见、播放中且缓冲安全时触发</text>
+    <rect x="298" y="335" width="92" height="28" rx="8" fill="#F3FBFD" stroke="#CAE1E9"/>
+    <text x="316" y="353" fill="#17627A" font-size="10" font-weight="750">平衡 · 90 分钟</text>
+
+    <text x="0" y="399" fill="#84909A" font-size="10">持续复测完成 · 结果只代表当前网络路径</text>
+
+    <rect x="0" y="418" width="402" height="75" rx="12" fill="#FFFFFF" stroke="#62C5E7" stroke-width="2"/>
+    <rect x="0" y="418" width="5" height="75" rx="2.5" fill="#00A1D6"/>
+    <text x="13" y="440" fill="#17212B" font-size="12" font-weight="750">当前最佳</text>
+    <rect x="81" y="428" width="34" height="16" rx="4" fill="#E6F7FC"/>
+    <text x="88" y="440" fill="#007DA7" font-size="9">复测</text>
+    <text x="13" y="464" fill="#697680" font-size="10" font-family="ui-monospace, Menlo, monospace">upos-example-b.bilivideo.com</text>
+    <text x="318" y="445" fill="#168957" font-size="13" font-weight="800">6.8 MB/s</text>
+    <text x="340" y="466" fill="#8A959D" font-size="9">86 ms</text>
+
+    <rect x="0" y="502" width="402" height="75" rx="12" fill="#FFFFFF" stroke="#DFE7ED"/>
+    <text x="13" y="525" fill="#17212B" font-size="12" font-weight="750">当前分配</text>
+    <text x="13" y="549" fill="#697680" font-size="10" font-family="ui-monospace, Menlo, monospace">upos-example-a.bilivideo.com</text>
+    <text x="318" y="530" fill="#168957" font-size="13" font-weight="800">3.1 MB/s</text>
+    <text x="340" y="551" fill="#8A959D" font-size="9">122 ms</text>
+
+    <line x1="0" y1="622" x2="402" y2="622" stroke="#E0E6EA"/>
+    <text x="0" y="649" fill="#89949D" font-size="10">不使用全局代理 · 不上传数据 · v1.7.0</text>
+    <text x="370" y="649" fill="#607987" font-size="10">说明</text>
+  </g>
+
+  <text x="1260" y="785" text-anchor="end" fill="#D8F8FF" font-size="12" font-family="Inter, sans-serif" opacity="0.9">界面示意 · 节点名称已匿名化</text>
+  </g>
+</svg>

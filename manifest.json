@@ -1,11 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "B站 CDN Switcher",
-  "version": "1.6.1",
-  "version_name": "1.7.0-rc.1",
-  "description": "仅在活动的 B 站播放标签页内学习、持续测速并在卡顿时切换 bilivideo.com 媒体 CDN。",
+  "name": "Bili CDN Switcher - B站视频 CDN 优选器",
+  "version": "1.7.0",
+  "description": "为 B 站点播视频在本机测速并切换 bilivideo.com CDN；无需全局代理，不上传数据。",
   "homepage_url": "https://github.com/liiliiliil/bili-cdn-switcher",
   "minimum_chrome_version": "111",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
   "permissions": [
     "activeTab",
     "declarativeNetRequestWithHostAccess",
@@ -22,7 +27,11 @@
     "type": "module"
   },
   "action": {
-    "default_title": "B站 CDN Switcher",
+    "default_title": "Bili CDN Switcher",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png"
+    },
     "default_popup": "src/popup.html"
   },
   "content_scripts": [
