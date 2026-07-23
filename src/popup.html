@@ -52,6 +52,17 @@
           <button id="autoMode" type="button" data-mode="auto">自动选择</button>
           <button id="manualMode" type="button" data-mode="manual">手动选择</button>
         </div>
+        <label class="refresh-setting" for="autoRefreshProfile">
+          <span>
+            自动重新优选
+            <small>只在可见、正在播放且缓冲安全时触发</small>
+          </span>
+          <select id="autoRefreshProfile">
+            <option value="frequent" data-short-label="积极">积极 · 30 分钟</option>
+            <option value="balanced" data-short-label="平衡">平衡 · 90 分钟</option>
+            <option value="economy" data-short-label="低频">低频 · 6 小时</option>
+          </select>
+        </label>
         <p id="benchmarkHint" class="hint">每轮最多测试 8 个候选，每个读取最多 256 KB。</p>
         <p id="bandwidthNotice" class="notice warning hidden"></p>
       </section>

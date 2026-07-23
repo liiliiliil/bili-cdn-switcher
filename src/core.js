@@ -1,6 +1,33 @@
 const BILIVIDEO_SUFFIX = ".bilivideo.com";
 const BILIBILI_SUFFIX = ".bilibili.com";
 
+export const AUTO_REFRESH_PROFILES = Object.freeze({
+  frequent: Object.freeze({
+    id: "frequent",
+    softTtlMs: 30 * 60 * 1000,
+    hardTtlMs: 60 * 60 * 1000
+  }),
+  balanced: Object.freeze({
+    id: "balanced",
+    softTtlMs: 90 * 60 * 1000,
+    hardTtlMs: 2 * 60 * 60 * 1000
+  }),
+  economy: Object.freeze({
+    id: "economy",
+    softTtlMs: 6 * 60 * 60 * 1000,
+    hardTtlMs: 12 * 60 * 60 * 1000
+  })
+});
+
+export function resolveAutoRefreshProfile(value) {
+  return (
+    (typeof value === "string" &&
+      Object.prototype.hasOwnProperty.call(AUTO_REFRESH_PROFILES, value) &&
+      AUTO_REFRESH_PROFILES[value]) ||
+    AUTO_REFRESH_PROFILES.balanced
+  );
+}
+
 export function validateCdnHost(value) {
   if (typeof value !== "string") {
     return { ok: false, error: "CDN host 必须是文本" };

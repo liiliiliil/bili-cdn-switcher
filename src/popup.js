@@ -12,6 +12,7 @@ const elements = {
   benchmarkAll: document.querySelector("#benchmarkAll"),
   autoMode: document.querySelector("#autoMode"),
   manualMode: document.querySelector("#manualMode"),
+  autoRefreshProfile: document.querySelector("#autoRefreshProfile"),
   benchmarkHint: document.querySelector("#benchmarkHint"),
   bandwidthNotice: document.querySelector("#bandwidthNotice"),
   candidateList: document.querySelector("#candidateList"),
@@ -46,6 +47,13 @@ function resultMap() {
   return new Map(
     (currentState?.benchmarks || []).map((result) => [result.host, result])
   );
+}
+
+function formatDuration(milliseconds) {
+  const minutes = Math.round(milliseconds / 60 / 1000);
+  return minutes % 60 === 0
+    ? `${minutes / 60} 小时`
+    : `${minutes} 分钟`;
 }
 
 function renderCandidates() {
@@ -148,11 +156,15 @@ function render() {
     !applicable || currentState.benchmarkRunning || !currentState.observedHost;
   elements.autoMode.disabled = !applicable;
   elements.manualMode.disabled = !applicable;
+  elements.autoRefreshProfile.disabled =
+    !applicable || currentState.config.mode !== "auto";
   elements.autoMode.classList.toggle("active", currentState.config.mode === "auto");
   elements.manualMode.classList.toggle(
     "active",
     currentState.config.mode === "manual"
   );
+  elements.autoRefreshProfile.value =
+    currentState.config.autoRefreshProfile || "balanced";
 
   elements.scopeNotice.classList.toggle("hidden", applicable);
   elements.scopeNotice.textContent =
@@ -182,23 +194,21 @@ function render() {
   const sustainedMb = Number(
     ((currentState.sustainedSampleBytes || 0) / 1024 / 1024).toFixed(1)
   );
-  const softMinutes = Math.round(
-    (currentState.autoRefreshSoftMs || 90 * 60 * 1000) / 60 / 1000
+  const softDuration = formatDuration(
+    currentState.autoRefreshSoftMs || 90 * 60 * 1000
   );
-  const hardHours = Number(
-    (
-      (currentState.autoResultTtlMs || 2 * 60 * 60 * 1000) /
-      60 /
-      60 /
-      1000
-    ).toFixed(1)
+  const hardDuration = formatDuration(
+    currentState.autoResultTtlMs || 2 * 60 * 60 * 1000
   );
+  const profileLabel =
+    elements.autoRefreshProfile.selectedOptions[0]?.dataset.shortLabel ||
+    "平衡";
   elements.benchmarkHint.textContent =
     `已从当前播放接口发现 ${currentState.discoveredCount || 0} 个 host；` +
     `先用 ${quickKb || 128} KB 初筛最多 ${currentState.benchmarkLimit || 8} 个，` +
     `再用 ${sustainedMb || 1} MB 复测前 ${currentState.sustainedFinalists || 3} 个。` +
-    `自动结果 ${softMinutes} 分钟后仅在可见播放且缓冲安全时按需复测，` +
-    `${hardHours} 小时后失效。`;
+    `${profileLabel}档下，自动结果 ${softDuration}后仅在可见播放且缓冲安全时按需复测，` +
+    `${hardDuration}后失效。`;
 
   const activeSustained = (currentState.benchmarks || []).find(
     (item) =>
@@ -252,6 +262,19 @@ elements.autoMode.addEventListener("click", async () => {
 
 elements.manualMode.addEventListener("click", async () => {
   await perform(() => send("SET_MODE", { mode: "manual" }));
+});
+
+elements.autoRefreshProfile.addEventListener("change", async () => {
+  const label =
+    elements.autoRefreshProfile.selectedOptions[0]?.dataset.shortLabel ||
+    "所选";
+  await perform(
+    () =>
+      send("SET_AUTO_REFRESH_PROFILE", {
+        profile: elements.autoRefreshProfile.value
+      }),
+    `已切换为${label}档`
+  );
 });
 
 elements.benchmarkAll.addEventListener("click", async () => {

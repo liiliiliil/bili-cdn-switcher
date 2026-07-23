@@ -1,6 +1,6 @@
 {
   "name": "bili-cdn-switcher",
-  "version": "1.6.0",
+  "version": "1.7.0-rc.1",
   "description": "Privacy-first Chromium MV3 extension that locally benchmarks and switches Bilibili video CDN hosts.",
   "private": true,
   "type": "module",

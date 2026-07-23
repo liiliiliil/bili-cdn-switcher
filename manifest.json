@@ -1,19 +1,20 @@
 {
   "manifest_version": 3,
   "name": "B站 CDN Switcher",
-  "version": "1.6.0",
+  "version": "1.6.1",
+  "version_name": "1.7.0-rc.1",
   "description": "仅在活动的 B 站播放标签页内学习、持续测速并在卡顿时切换 bilivideo.com 媒体 CDN。",
   "homepage_url": "https://github.com/liiliiliil/bili-cdn-switcher",
   "minimum_chrome_version": "111",
   "permissions": [
     "activeTab",
-    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
     "storage",
     "webRequest"
   ],
   "host_permissions": [
-    "https://bilibili.com/*",
-    "https://*.bilibili.com/*",
+    "https://www.bilibili.com/*",
+    "https://m.bilibili.com/*",
     "https://*.bilivideo.com/*"
   ],
   "background": {

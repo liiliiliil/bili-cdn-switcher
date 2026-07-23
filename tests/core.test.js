@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  AUTO_REFRESH_PROFILES,
   buildSessionRedirectRule,
   classifyAutoResultAge,
   chooseAutoBenchmark,
@@ -14,11 +15,51 @@ import {
   makeProbeRange,
   playbackPageKey,
   replaceMediaHost,
+  resolveAutoRefreshProfile,
   selectBestBenchmark,
   selectRecoveryBenchmark,
   uniqueCandidates,
   validateCdnHost
 } from "../src/core.js";
+
+test("自动重新优选使用受限预设并默认回退到平衡档", () => {
+  assert.deepEqual(resolveAutoRefreshProfile("frequent"), {
+    id: "frequent",
+    softTtlMs: 30 * 60 * 1000,
+    hardTtlMs: 60 * 60 * 1000
+  });
+  assert.deepEqual(resolveAutoRefreshProfile("economy"), {
+    id: "economy",
+    softTtlMs: 6 * 60 * 60 * 1000,
+    hardTtlMs: 12 * 60 * 60 * 1000
+  });
+  assert.equal(resolveAutoRefreshProfile("unknown").id, "balanced");
+  assert.equal(resolveAutoRefreshProfile("__proto__").id, "balanced");
+  assert.equal(Object.isFrozen(AUTO_REFRESH_PROFILES), true);
+});
+
+test("每个自动重新优选档位都保持软过期早于硬过期", () => {
+  const now = 50_000_000;
+  for (const profile of Object.values(AUTO_REFRESH_PROFILES)) {
+    const options = {
+      now,
+      softTtlMs: profile.softTtlMs,
+      hardTtlMs: profile.hardTtlMs
+    };
+    assert.equal(
+      classifyAutoResultAge(now - profile.softTtlMs + 1, options),
+      "fresh"
+    );
+    assert.equal(
+      classifyAutoResultAge(now - profile.softTtlMs, options),
+      "stale"
+    );
+    assert.equal(
+      classifyAutoResultAge(now - profile.hardTtlMs, options),
+      "expired"
+    );
+  }
+});
 
 test("只接受 bilivideo.com 子域名作为目标", () => {
   assert.deepEqual(validateCdnHost("UPOS-SZ-MIRRORHW.BILIVIDEO.COM"), {
