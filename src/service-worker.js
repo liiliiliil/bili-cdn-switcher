@@ -1,5 +1,6 @@
 import { BUILTIN_CANDIDATES } from "./candidates.js";
 import {
+  AUTO_REFRESH_PROFILES,
   buildSessionRedirectRule,
   classifyAutoResultAge,
   chooseAutoBenchmark,
@@ -12,6 +13,7 @@ import {
   makeProbeRange,
   playbackPageKey,
   replaceMediaHost,
+  resolveAutoRefreshProfile,
   selectRecoveryBenchmark,
   uniqueCandidates,
   validateCdnHost
@@ -31,12 +33,15 @@ const MAX_PLAYURL_URLS = 80;
 const MAX_LEARNED_HOSTS = 24;
 const MAX_BENCHMARK_HOSTS = 8;
 const HOST_HEALTH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const AUTO_REFRESH_SOFT_MS = 90 * 60 * 1000;
-const AUTO_RESULT_TTL_MS = 2 * 60 * 60 * 1000;
 const AUTO_ACTIVITY_RETRY_MS = 30 * 1000;
 const AUTO_FAILURE_RETRY_MS = 5 * 60 * 1000;
 const tabStates = new Map();
 let autoRefreshOwnerTabId = null;
+
+function extensionVersion() {
+  const manifest = chrome.runtime.getManifest();
+  return manifest.version_name || manifest.version;
+}
 
 const DEFAULT_CONFIG = Object.freeze({
   enabled: false,
@@ -45,7 +50,8 @@ const DEFAULT_CONFIG = Object.freeze({
   customHosts: [],
   autoBestHost: "",
   autoBestAt: 0,
-  autoBestSchema: 0
+  autoBestSchema: 0,
+  autoRefreshProfile: "balanced"
 });
 
 function stateFor(tabId) {
@@ -83,7 +89,13 @@ function appendEvent(tabId, event) {
 
 async function getConfig() {
   const stored = await chrome.storage.local.get(CONFIG_KEY);
-  return { ...DEFAULT_CONFIG, ...(stored[CONFIG_KEY] || {}) };
+  const config = { ...DEFAULT_CONFIG, ...(stored[CONFIG_KEY] || {}) };
+  return {
+    ...config,
+    autoRefreshProfile: resolveAutoRefreshProfile(
+      config.autoRefreshProfile
+    ).id
+  };
 }
 
 async function saveConfig(patch) {
@@ -95,11 +107,12 @@ async function saveConfig(patch) {
 
 function freshAutoHost(config) {
   const validation = validateCdnHost(config.autoBestHost || "");
+  const policy = resolveAutoRefreshProfile(config.autoRefreshProfile);
   return (
     validation.ok &&
     config.autoBestSchema === BENCHMARK_SCHEMA &&
     Number.isFinite(config.autoBestAt) &&
-    Date.now() - config.autoBestAt < AUTO_RESULT_TTL_MS
+    Date.now() - config.autoBestAt < policy.hardTtlMs
   )
     ? validation.host
     : "";
@@ -113,9 +126,10 @@ function autoResultStatus(config) {
   ) {
     return "expired";
   }
+  const policy = resolveAutoRefreshProfile(config.autoRefreshProfile);
   return classifyAutoResultAge(config.autoBestAt, {
-    softTtlMs: AUTO_REFRESH_SOFT_MS,
-    hardTtlMs: AUTO_RESULT_TTL_MS
+    softTtlMs: policy.softTtlMs,
+    hardTtlMs: policy.hardTtlMs
   });
 }
 
@@ -899,6 +913,9 @@ async function recoverFromPlaybackStall(tabId, details = {}) {
 
 async function publicState(tabId, pageUrl = "") {
   const config = await getConfig();
+  const autoRefreshPolicy = resolveAutoRefreshProfile(
+    config.autoRefreshProfile
+  );
   const state = pageUrl ? updatePageState(tabId, pageUrl) : stateFor(tabId);
   if (state.playback && !state.playurlUrls.length) {
     await refreshPlayurlUrlsFromPage(tabId);
@@ -912,7 +929,7 @@ async function publicState(tabId, pageUrl = "") {
     activeRule?.action?.redirect?.transform?.host || targetHost || "";
   const candidates = await candidatesFor(config, state);
   return {
-    version: chrome.runtime.getManifest().version,
+    version: extensionVersion(),
     contentVersion: state.contentVersion,
     applicable: state.playback && isPlaybackUrl(state.pageUrl),
     config,
@@ -926,8 +943,9 @@ async function publicState(tabId, pageUrl = "") {
     quickSampleBytes: QUICK_SAMPLE_BYTES,
     sustainedSampleBytes: SUSTAINED_SAMPLE_BYTES,
     sustainedFinalists: SUSTAINED_FINALISTS,
-    autoRefreshSoftMs: AUTO_REFRESH_SOFT_MS,
-    autoResultTtlMs: AUTO_RESULT_TTL_MS,
+    autoRefreshSoftMs: autoRefreshPolicy.softTtlMs,
+    autoResultTtlMs: autoRefreshPolicy.hardTtlMs,
+    autoRefreshProfiles: Object.values(AUTO_REFRESH_PROFILES),
     autoResultStatus: autoResultStatus(config),
     discoveredCount: playurlHosts(state).length,
     candidates,
@@ -950,7 +968,7 @@ async function diagnosticState(tabId) {
   const ruleHost =
     activeRule?.action?.redirect?.transform?.host || targetHost || "";
   return {
-    version: chrome.runtime.getManifest().version,
+    version: extensionVersion(),
     enabled: config.enabled,
     mode: config.mode,
     ruleActive,
@@ -963,7 +981,8 @@ async function diagnosticState(tabId) {
     discoveredCount: playurlHosts(state).length,
     learnedCount: learnedCandidates(health).length,
     recoveryCount: state.recoveryCount,
-    autoResultStatus: autoResultStatus(config)
+    autoResultStatus: autoResultStatus(config),
+    autoRefreshProfile: config.autoRefreshProfile
   };
 }
 
@@ -1052,6 +1071,19 @@ async function handleMessage(message, sender) {
       }
       await applyToKnownPlaybackTabs();
       return publicState(tabId);
+    case "SET_AUTO_REFRESH_PROFILE": {
+      const policy = resolveAutoRefreshProfile(message.profile);
+      if (policy.id !== message.profile) {
+        throw new Error("自动复测频率无效");
+      }
+      await saveConfig({ autoRefreshProfile: policy.id });
+      const state = stateFor(tabId);
+      state.autoAttempted = false;
+      state.nextAutoRefreshCheckAt = 0;
+      await maybeRunAuto(tabId);
+      await pushDiagnostics(tabId);
+      return publicState(tabId);
+    }
     case "SET_TARGET": {
       const validation = validateCdnHost(message.host);
       if (!validation.ok) throw new Error(validation.error);

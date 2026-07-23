@@ -8,17 +8,26 @@ const manifest = JSON.parse(
 
 test("manifest 使用 MV3 且默认没有代理权限", () => {
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.6.0");
+  assert.equal(manifest.version, "1.6.1");
+  assert.equal(manifest.version_name, "1.7.0-rc.1");
   assert.equal(manifest.permissions.includes("proxy"), false);
   assert.equal(manifest.permissions.includes("webRequestBlocking"), false);
   assert.equal(manifest.permissions.includes("alarms"), false);
   assert.equal(manifest.permissions.includes("<all_urls>"), false);
+  assert.equal(
+    manifest.permissions.includes("declarativeNetRequestWithHostAccess"),
+    true
+  );
+  assert.equal(
+    manifest.permissions.includes("declarativeNetRequest"),
+    false
+  );
 });
 
 test("host 权限只覆盖 B 站页面与 bilivideo 媒体", () => {
   assert.deepEqual(manifest.host_permissions, [
-    "https://bilibili.com/*",
-    "https://*.bilibili.com/*",
+    "https://www.bilibili.com/*",
+    "https://m.bilibili.com/*",
     "https://*.bilivideo.com/*"
   ]);
 });

@@ -229,6 +229,40 @@ input:disabled {
   box-shadow: 0 2px 7px rgb(36 69 90 / 10%);
 }
 
+.refresh-setting {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid #dfe7ed;
+  border-radius: 10px;
+  color: #52616c;
+  background: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.refresh-setting small {
+  display: block;
+  margin-top: 2px;
+  color: #8a959d;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.refresh-setting select {
+  max-width: 125px;
+  padding: 6px 7px;
+  border: 1px solid #cae1e9;
+  border-radius: 7px;
+  color: #17627a;
+  background: #f3fbfd;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .hint {
   margin-top: 7px;
   color: #84909a;

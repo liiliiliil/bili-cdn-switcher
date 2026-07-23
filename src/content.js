@@ -1,7 +1,9 @@
 (() => {
   let lastUrl = location.href;
   let latestPlayurlUrls = [];
-  const extensionVersion = chrome.runtime.getManifest().version;
+  const extensionManifest = chrome.runtime.getManifest();
+  const extensionVersion =
+    extensionManifest.version_name || extensionManifest.version;
   const maxAllowedSampleBytes = 1024 * 1024;
   const stallConfirmMs = 4500;
   const stallCooldownMs = 15000;
@@ -41,6 +43,8 @@
     root.bilibiliCdnSwitcherBenchmarkPhase = status.benchmarkPhase || "";
     root.bilibiliCdnSwitcherAutoResultStatus =
       status.autoResultStatus || "";
+    root.bilibiliCdnSwitcherAutoRefreshProfile =
+      status.autoRefreshProfile || "";
   };
 
   const syncDiagnostics = () => {
