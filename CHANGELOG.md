@@ -6,6 +6,17 @@ All notable changes to this project are documented here.
 
 - Nothing yet.
 
+## [1.7.1] - 2026-07-24
+
+- Release an expired automatic result's stale redirect rule before checking whether the page has enough safe buffer to re-benchmark.
+- Fall back to Bilibili's original signed media host when every in-memory recovery candidate is exhausted, then immediately start a fresh bounded benchmark.
+- Retry the stalled media position one second earlier after a recovery rule is installed, which reliably crosses the player's seek tolerance.
+- Re-schedule stall detection for the end of its cooldown instead of silently dropping a recovery check triggered by that seek.
+- Keep a short, tab-local memory of recently stalled hosts across recovery benchmarks so the next cycle does not immediately select them again.
+- Prefer the current video-track path and its matching Range for benchmarks, instead of allowing a much lighter audio request to overstate 4K throughput.
+- Invalidate cached automatic results from the older benchmark schema on upgrade, and make the popup's 4K bandwidth caution more conservative.
+- Show the original-host fallback clearly in local recovery diagnostics.
+
 ## [1.7.0] - 2026-07-24
 
 - Added frequent, balanced and low-frequency automatic re-benchmark profiles; the existing 90-minute soft expiry and 2-hour hard expiry remain the default.
@@ -37,6 +48,7 @@ All notable changes to this project are documented here.
 
 - Added two-stage Range benchmarking, bounded dynamic host learning and playback-stall recovery.
 
-[Unreleased]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/liiliiliil/bili-cdn-switcher/releases/tag/v1.6.0

@@ -1,6 +1,7 @@
 (() => {
   let lastUrl = location.href;
   let latestPlayurlUrls = [];
+  let latestPlayurlVideoUrls = [];
   const extensionManifest = chrome.runtime.getManifest();
   const extensionVersion =
     extensionManifest.version_name || extensionManifest.version;
@@ -243,7 +244,11 @@
       return false;
     }
     if (message.type === "GET_PLAYURL_URLS") {
-      sendResponse({ ok: true, urls: latestPlayurlUrls });
+      sendResponse({
+        ok: true,
+        urls: latestPlayurlUrls,
+        videoUrls: latestPlayurlVideoUrls
+      });
       return false;
     }
     if (message.type === "GET_PLAYBACK_ACTIVITY") {
@@ -301,7 +306,7 @@
     stallTimer = 0;
   };
 
-  const scheduleStallCheck = (video) => {
+  const scheduleStallCheck = (video, delayMs = stallConfirmMs) => {
     cancelStallTimer();
     if (
       !(video instanceof HTMLVideoElement) ||
@@ -320,9 +325,14 @@
         video.ended ||
         video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA ||
         bufferedAhead(video) >= 0.5 ||
-        document.visibilityState !== "visible" ||
-        now - lastStallReportAt < stallCooldownMs
+        document.visibilityState !== "visible"
       ) {
+        return;
+      }
+      const cooldownRemaining =
+        stallCooldownMs - (now - lastStallReportAt);
+      if (cooldownRemaining > 0) {
+        scheduleStallCheck(video, cooldownRemaining);
         return;
       }
       lastStallReportAt = now;
@@ -339,24 +349,53 @@
             if (chrome.runtime.lastError || !response?.ok) return;
             const recovery = response.data;
             if (!recovery?.switched || !video.isConnected) return;
+            const recoveryTarget =
+              recovery.fallback === "origin"
+                ? "origin"
+                : recovery.host || "";
             document.documentElement.dataset.bilibiliCdnSwitcherLastRecovery =
-              `${recovery.fromHost || ""}->${recovery.host || ""}`;
-            setTimeout(() => {
+              `${recovery.fromHost || ""}->${recoveryTarget}`;
+            const retryPlayback = () => {
               if (!video.isConnected || video.ended) return;
-              const resumeAt = Math.max(0, video.currentTime - 0.15);
+              const resumeAt = Math.max(0, video.currentTime - 1);
               try {
                 video.currentTime = resumeAt;
                 void video.play().catch(() => {});
               } catch {
                 // The player can recover on its next retry even if seeking fails.
               }
-            }, 150);
+            };
+            setTimeout(retryPlayback, 150);
+            if (recovery.retryBenchmark) {
+              setTimeout(() => {
+                try {
+                  chrome.runtime.sendMessage(
+                    {
+                      type: "RUN_BENCHMARK",
+                      extensionVersion,
+                      preserveStalledHosts: true
+                    },
+                    (benchmarkResponse) => {
+                      if (
+                        chrome.runtime.lastError ||
+                        !benchmarkResponse?.ok
+                      ) {
+                        return;
+                      }
+                      setTimeout(retryPlayback, 50);
+                    }
+                  );
+                } catch {
+                  // A later playback request can retry automatic selection.
+                }
+              }, 250);
+            }
           }
         );
       } catch {
         // An extension reload can invalidate an old content-script context.
       }
-    }, stallConfirmMs);
+    }, Math.max(Number(delayMs) || stallConfirmMs, 250));
   };
 
   ["waiting", "stalled", "seeking", "play", "seeked"].forEach(
@@ -378,8 +417,9 @@
         lastUrl = location.href;
         reportNavigation("NAVIGATION");
       }
-      const urls = Array.isArray(event.detail?.urls)
-        ? event.detail.urls
+      const sanitizeMediaUrls = (values) =>
+        Array.isArray(values)
+          ? values
             .filter((value) => {
               if (typeof value !== "string") return false;
               const url = new URL(value);
@@ -394,12 +434,21 @@
               );
             })
             .slice(0, 80)
-        : [];
+          : [];
+      const urls = sanitizeMediaUrls(event.detail?.urls);
+      const videoUrls = sanitizeMediaUrls(event.detail?.videoUrls);
       if (urls.length) {
         latestPlayurlUrls = [
           ...new Set([...urls, ...latestPlayurlUrls])
         ].slice(0, 80);
-        send({ type: "PLAYURL_URLS", urls: latestPlayurlUrls });
+        latestPlayurlVideoUrls = [
+          ...new Set([...videoUrls, ...latestPlayurlVideoUrls])
+        ].slice(0, 80);
+        send({
+          type: "PLAYURL_URLS",
+          urls: latestPlayurlUrls,
+          videoUrls: latestPlayurlVideoUrls
+        });
       }
     } catch {
       // Ignore malformed events from the host page.
@@ -407,7 +456,10 @@
   });
 
   const reportNavigation = (type = "READY") => {
-    if (type === "NAVIGATION") latestPlayurlUrls = [];
+    if (type === "NAVIGATION") {
+      latestPlayurlUrls = [];
+      latestPlayurlVideoUrls = [];
+    }
     send({ type, url: location.href });
   };
 

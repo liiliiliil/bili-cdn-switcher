@@ -13,11 +13,15 @@ import {
   isPlaybackUrl,
   isSupportedMediaUrl,
   makeProbeRange,
+  planStallRecovery,
   playbackPageKey,
   replaceMediaHost,
+  retainRecentStalledHosts,
   resolveAutoRefreshProfile,
+  sameMediaPath,
   selectBestBenchmark,
   selectRecoveryBenchmark,
+  shouldReleaseExpiredAutoRule,
   uniqueCandidates,
   validateCdnHost
 } from "../src/core.js";
@@ -85,6 +89,22 @@ test("媒体 URL 替换只改变 scheme 和 host", () => {
   );
 });
 
+test("媒体轨匹配只比较路径，不受 CDN host 和签名参数影响", () => {
+  assert.equal(
+    sameMediaPath(
+      "https://a.bilivideo.com/path/video.m4s?token=one",
+      "https://b.bilivideo.com/path/video.m4s?token=two"
+    ),
+    true
+  );
+  assert.equal(
+    sameMediaPath(
+      "https://a.bilivideo.com/path/video.m4s",
+      "https://a.bilivideo.com/path/audio.m4s"
+    ),
+    false
+  );
+});
 test("测速使用播放器当前 Range，并限制读取大小", () => {
   assert.equal(
     makeProbeRange("bytes=4865806381-4884696416", 262144),
@@ -247,6 +267,73 @@ test("卡顿恢复跳过当前与已失败节点", () => {
     ["b.bilivideo.com"]
   );
   assert.equal(next.host, "c.bilivideo.com");
+});
+
+test("卡顿候选耗尽时回退原始节点并请求重新测速", () => {
+  assert.deepEqual(
+    planStallRecovery([], "old.bilivideo.com", ["old.bilivideo.com"]),
+    {
+      kind: "origin",
+      candidate: null,
+      retryBenchmark: true
+    }
+  );
+  const planned = planStallRecovery(
+    [{ host: "next.bilivideo.com", ok: true, mbps: 9, ttfbMs: 80 }],
+    "old.bilivideo.com"
+  );
+  assert.equal(planned.kind, "candidate");
+  assert.equal(planned.candidate.host, "next.bilivideo.com");
+  assert.equal(planned.retryBenchmark, false);
+});
+
+test("重新测速只保留最近失败节点，避免立即选回又不永久拉黑", () => {
+  assert.deepEqual(
+    retainRecentStalledHosts(
+      [
+        "a.bilivideo.com",
+        "b.bilivideo.com",
+        "c.bilivideo.com",
+        "d.bilivideo.com"
+      ],
+      3
+    ),
+    [
+      "b.bilivideo.com",
+      "c.bilivideo.com",
+      "d.bilivideo.com"
+    ]
+  );
+  assert.deepEqual(
+    retainRecentStalledHosts(
+      ["a.bilivideo.com", "b.bilivideo.com", "a.bilivideo.com"],
+      2
+    ),
+    ["b.bilivideo.com", "a.bilivideo.com"]
+  );
+});
+
+test("自动结果硬过期后会释放仍在生效的旧规则", () => {
+  assert.equal(
+    shouldReleaseExpiredAutoRule(
+      "expired",
+      "",
+      "old.bilivideo.com"
+    ),
+    true
+  );
+  assert.equal(
+    shouldReleaseExpiredAutoRule(
+      "stale",
+      "old.bilivideo.com",
+      "old.bilivideo.com"
+    ),
+    false
+  );
+  assert.equal(
+    shouldReleaseExpiredAutoRule("expired", "", ""),
+    false
+  );
 });
 
 test("已有可用节点时，只有明显更快才自动切换", () => {
