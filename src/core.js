@@ -139,6 +139,14 @@ export function replaceMediaHost(value, targetHost) {
   return url.href;
 }
 
+export function sameMediaPath(first, second) {
+  try {
+    return new URL(first).pathname === new URL(second).pathname;
+  } catch {
+    return false;
+  }
+}
+
 export function makeProbeRange(
   value,
   maxBytes = 256 * 1024,
@@ -294,6 +302,46 @@ export function selectRecoveryBenchmark(
     (Array.isArray(results) ? results : []).filter(
       (item) => !excluded.has(item?.host)
     )
+  );
+}
+
+export function retainRecentStalledHosts(hosts, limit = 3) {
+  const safeLimit = Math.max(0, Math.floor(Number(limit) || 0));
+  if (!safeLimit) return [];
+  const recent = [];
+  for (const host of Array.isArray(hosts) ? hosts : []) {
+    if (typeof host !== "string" || !host) continue;
+    const existingIndex = recent.indexOf(host);
+    if (existingIndex >= 0) recent.splice(existingIndex, 1);
+    recent.push(host);
+  }
+  return recent.slice(-safeLimit);
+}
+
+export function planStallRecovery(
+  results,
+  currentHost = "",
+  excludedHosts = []
+) {
+  const candidate = selectRecoveryBenchmark(
+    results,
+    currentHost,
+    excludedHosts
+  );
+  return candidate
+    ? { kind: "candidate", candidate, retryBenchmark: false }
+    : { kind: "origin", candidate: null, retryBenchmark: true };
+}
+
+export function shouldReleaseExpiredAutoRule(
+  resultStatus,
+  cachedHost = "",
+  activeHost = ""
+) {
+  return (
+    resultStatus === "expired" &&
+    !cachedHost &&
+    Boolean(activeHost)
   );
 }
 

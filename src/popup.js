@@ -184,11 +184,15 @@ function render() {
   elements.observedHost.textContent =
     currentState.observedHost || "尚未捕获，请播放视频";
   elements.activeHost.textContent = currentState.activeHost || "未启用";
+  const recoveryTarget =
+    currentState.lastRecovery?.fallback === "origin"
+      ? "B 站原始节点"
+      : currentState.lastRecovery?.host || "已切换";
   elements.recoveryStatus.textContent = currentState.recoveryCount
-    ? `${currentState.recoveryCount} 次 · ${currentState.lastRecovery?.host || "已切换"}`
+    ? `${currentState.recoveryCount} 次 · ${recoveryTarget}`
     : "尚未触发";
   elements.recoveryStatus.title = currentState.lastRecovery
-    ? `${currentState.lastRecovery.fromHost} → ${currentState.lastRecovery.host}`
+    ? `${currentState.lastRecovery.fromHost} → ${recoveryTarget}`
     : "";
   const quickKb = Math.round((currentState.quickSampleBytes || 0) / 1024);
   const sustainedMb = Number(
@@ -203,8 +207,13 @@ function render() {
   const profileLabel =
     elements.autoRefreshProfile.selectedOptions[0]?.dataset.shortLabel ||
     "平衡";
+  const sampleLabel =
+    currentState.sampleKind === "video"
+      ? "当前按实际视频轨测速；"
+      : "";
   elements.benchmarkHint.textContent =
     `已从当前播放接口发现 ${currentState.discoveredCount || 0} 个 host；` +
+    sampleLabel +
     `先用 ${quickKb || 128} KB 初筛最多 ${currentState.benchmarkLimit || 8} 个，` +
     `再用 ${sustainedMb || 1} MB 复测前 ${currentState.sustainedFinalists || 3} 个。` +
     `${profileLabel}档下，自动结果 ${softDuration}后仅在可见播放且缓冲安全时按需复测，` +
@@ -227,10 +236,10 @@ function render() {
     )
     .sort((a, b) => b.mbps - a.mbps)[0];
   const referenceSpeed = activeSustained || bestHealthySustained;
-  const mayBeSlowFor4k = referenceSpeed && referenceSpeed.mbps < 10;
+  const mayBeSlowFor4k = referenceSpeed && referenceSpeed.mbps < 20;
   elements.bandwidthNotice.classList.toggle("hidden", !mayBeSlowFor4k);
   elements.bandwidthNotice.textContent = mayBeSlowFor4k
-    ? `当前可用节点持续测速约 ${referenceSpeed.mbps} Mbps，对 4K 可能仍不够；卡住时自动模式会继续尝试下一节点。`
+    ? `当前可用节点持续测速约 ${referenceSpeed.mbps} Mbps；若正在看 4K，可能仍不够。卡住时自动模式会继续尝试下一节点。`
     : "";
 
   renderCandidates();

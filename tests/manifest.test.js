@@ -8,7 +8,7 @@ const manifest = JSON.parse(
 
 test("manifest 使用 MV3 且默认没有代理权限", () => {
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.7.0");
+  assert.equal(manifest.version, "1.7.1");
   assert.equal("version_name" in manifest, false);
   assert.equal(manifest.permissions.includes("proxy"), false);
   assert.equal(manifest.permissions.includes("webRequestBlocking"), false);

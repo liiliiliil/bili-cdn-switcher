@@ -11,10 +11,14 @@ import {
   isPlaybackUrl,
   isSupportedMediaUrl,
   makeProbeRange,
+  planStallRecovery,
   playbackPageKey,
   replaceMediaHost,
+  retainRecentStalledHosts,
   resolveAutoRefreshProfile,
+  sameMediaPath,
   selectRecoveryBenchmark,
+  shouldReleaseExpiredAutoRule,
   uniqueCandidates,
   validateCdnHost
 } from "./core.js";
@@ -27,11 +31,12 @@ const SUSTAINED_SAMPLE_BYTES = 1024 * 1024;
 const QUICK_TEST_TIMEOUT_MS = 5000;
 const SUSTAINED_TEST_TIMEOUT_MS = 9000;
 const SUSTAINED_FINALISTS = 3;
-const BENCHMARK_SCHEMA = 2;
+const BENCHMARK_SCHEMA = 3;
 const MAX_EVENTS = 24;
 const MAX_PLAYURL_URLS = 80;
 const MAX_LEARNED_HOSTS = 24;
 const MAX_BENCHMARK_HOSTS = 8;
+const RECENT_STALL_HOST_LIMIT = 3;
 const HOST_HEALTH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const AUTO_ACTIVITY_RETRY_MS = 30 * 1000;
 const AUTO_FAILURE_RETRY_MS = 5 * 60 * 1000;
@@ -64,7 +69,10 @@ function stateFor(tabId) {
       observedHost: "",
       sampleUrl: "",
       sampleRange: "",
+      videoSampleUrl: "",
+      videoSampleRange: "",
       playurlUrls: [],
+      playurlVideoUrls: [],
       autoHost: "",
       benchmarkRunning: false,
       benchmarkPhase: "",
@@ -393,7 +401,10 @@ function updatePageState(tabId, pageUrl) {
     state.observedHost = "";
     state.sampleUrl = "";
     state.sampleRange = "";
+    state.videoSampleUrl = "";
+    state.videoSampleRange = "";
     state.playurlUrls = [];
+    state.playurlVideoUrls = [];
     state.autoHost = "";
     state.autoAttempted = false;
     state.autoRefreshChecking = false;
@@ -408,7 +419,7 @@ function updatePageState(tabId, pageUrl) {
   return state;
 }
 
-function observePlayurlUrls(tabId, values) {
+function observePlayurlUrls(tabId, values, videoValues = []) {
   if (tabId < 0 || !Array.isArray(values)) return [];
   const state = stateFor(tabId);
   const urls = values
@@ -419,6 +430,22 @@ function observePlayurlUrls(tabId, values) {
   state.playurlUrls = [
     ...new Set([...urls, ...state.playurlUrls])
   ].slice(0, MAX_PLAYURL_URLS);
+  const videoUrls = (Array.isArray(videoValues) ? videoValues : [])
+    .filter((value) => typeof value === "string" && isSupportedMediaUrl(value))
+    .map((value) => new URL(value).href);
+  state.playurlVideoUrls = [
+    ...new Set([...videoUrls, ...state.playurlVideoUrls])
+  ].slice(0, MAX_PLAYURL_URLS);
+  if (
+    !state.videoSampleUrl &&
+    state.sampleUrl &&
+    state.playurlVideoUrls.some((value) =>
+      sameMediaPath(value, state.sampleUrl)
+    )
+  ) {
+    state.videoSampleUrl = state.sampleUrl;
+    state.videoSampleRange = state.sampleRange;
+  }
   const hosts = playurlHosts(state);
   appendEvent(tabId, {
     kind: "playurl",
@@ -434,17 +461,33 @@ function observeMedia(tabId, value, source = "request", rangeHeader = "") {
   const state = stateFor(tabId);
   const url = new URL(value);
   state.observedHost = url.hostname;
-  if (!state.sampleUrl || /\.(m4s|mp4)(?:$|\?)/i.test(url.href)) {
+  const isVideoSample = state.playurlVideoUrls.some((candidate) =>
+    sameMediaPath(candidate, url.href)
+  );
+  if (
+    isVideoSample ||
+    !state.sampleUrl ||
+    (!state.videoSampleUrl && /\.(m4s|mp4)(?:$|\?)/i.test(url.href))
+  ) {
     state.sampleUrl = url.href;
   }
   const probeRange = makeProbeRange(rangeHeader, QUICK_SAMPLE_BYTES);
-  if (probeRange) state.sampleRange = rangeHeader.trim();
+  if (probeRange && (isVideoSample || !state.videoSampleUrl)) {
+    state.sampleRange = rangeHeader.trim();
+  }
+  if (isVideoSample) {
+    state.videoSampleUrl = url.href;
+    if (probeRange) state.videoSampleRange = rangeHeader.trim();
+  }
   appendEvent(tabId, {
     kind: source,
     host: url.hostname,
     range: probeRange || ""
   });
-  if (state.sampleRange) void maybeRunAuto(tabId);
+  const activeSampleRange = state.videoSampleUrl
+    ? state.videoSampleRange
+    : state.sampleRange;
+  if (activeSampleRange) void maybeRunAuto(tabId);
 }
 
 function benchmarkSpec(
@@ -457,8 +500,15 @@ function benchmarkSpec(
     stage = "quick"
   } = {}
 ) {
-  const sample = new URL(state.sampleUrl);
-  const directUrls = state.playurlUrls.filter(
+  const sampleUrl = state.videoSampleUrl || state.sampleUrl;
+  const sampleRange = state.videoSampleUrl
+    ? state.videoSampleRange
+    : state.sampleRange;
+  const sample = new URL(sampleUrl);
+  const directPool = state.videoSampleUrl
+    ? state.playurlVideoUrls
+    : state.playurlUrls;
+  const directUrls = directPool.filter(
     (value) =>
       isSupportedMediaUrl(value) &&
       new URL(value).hostname === candidate.host
@@ -466,14 +516,15 @@ function benchmarkSpec(
   const exact = directUrls.find(
     (value) => new URL(value).pathname === sample.pathname
   );
-  const directUrl = exact || directUrls[0] || "";
+  const directUrl =
+    exact || (state.videoSampleUrl ? "" : directUrls[0] || "");
   const baseRange =
     exact || !directUrl
-      ? state.sampleRange || "bytes=0-"
+      ? sampleRange || "bytes=0-"
       : "bytes=0-";
   return {
     host: candidate.host,
-    url: directUrl || replaceMediaHost(state.sampleUrl, candidate.host),
+    url: directUrl || replaceMediaHost(sampleUrl, candidate.host),
     range:
       makeProbeRange(baseRange, maxBytes, offsetBytes) ||
       makeProbeRange("bytes=0-", maxBytes),
@@ -609,16 +660,24 @@ async function refreshPlayurlUrlsFromPage(tabId) {
       type: "GET_PLAYURL_URLS"
     });
     if (response?.ok && Array.isArray(response.urls)) {
-      observePlayurlUrls(tabId, response.urls);
+      observePlayurlUrls(tabId, response.urls, response.videoUrls);
     }
   } catch {
     // The page observer is optional; webRequest discovery remains available.
   }
 }
 
-async function runBenchmark(tabId, requestedHosts = null) {
+async function runBenchmark(
+  tabId,
+  requestedHosts = null,
+  { preserveStalledHosts = false } = {}
+) {
   const state = stateFor(tabId);
-  if (!state.sampleUrl) {
+  const sampleUrl = state.videoSampleUrl || state.sampleUrl;
+  const sampleRange = state.videoSampleUrl
+    ? state.videoSampleRange
+    : state.sampleRange;
+  if (!sampleUrl || !sampleRange) {
     throw new Error("还没有捕获到媒体 URL。请先播放几秒视频，再测速。");
   }
   if (state.benchmarkRunning) {
@@ -652,7 +711,12 @@ async function runBenchmark(tabId, requestedHosts = null) {
 
   state.benchmarkRunning = true;
   state.benchmarkPhase = "quick";
-  state.stalledHosts = [];
+  state.stalledHosts = preserveStalledHosts
+    ? retainRecentStalledHosts(
+        state.stalledHosts,
+        RECENT_STALL_HOST_LIMIT
+      )
+    : [];
   appendEvent(tabId, { kind: "benchmark-start", count: candidates.length });
   await removeRule(tabId);
   await pushDiagnostics(tabId);
@@ -725,7 +789,13 @@ async function runBenchmark(tabId, requestedHosts = null) {
     state.benchmarks = [...previous.values()];
     await saveBenchmarkHealth(results);
 
-    const best = chooseAutoBenchmark(results, config.autoBestHost);
+    let best = preserveStalledHosts
+      ? selectRecoveryBenchmark(results, "", state.stalledHosts)
+      : chooseAutoBenchmark(results, config.autoBestHost);
+    if (!best && preserveStalledHosts) {
+      state.stalledHosts = [];
+      best = chooseAutoBenchmark(results, config.autoBestHost);
+    }
     const freshConfig = await getConfig();
     if (freshConfig.enabled && freshConfig.mode === "auto" && best) {
       state.autoHost = best.host;
@@ -754,10 +824,14 @@ async function runBenchmark(tabId, requestedHosts = null) {
 
 async function maybeRunAuto(tabId) {
   const state = stateFor(tabId);
+  const sampleUrl = state.videoSampleUrl || state.sampleUrl;
+  const sampleRange = state.videoSampleUrl
+    ? state.videoSampleRange
+    : state.sampleRange;
   if (
     state.benchmarkRunning ||
-    !state.sampleUrl ||
-    !state.sampleRange
+    !sampleUrl ||
+    !sampleRange
   ) {
     return;
   }
@@ -765,6 +839,23 @@ async function maybeRunAuto(tabId) {
   if (!config.enabled || config.mode !== "auto" || !state.playback) return;
   const cachedHost = freshAutoHost(config);
   const resultStatus = autoResultStatus(config);
+  if (
+    shouldReleaseExpiredAutoRule(
+      resultStatus,
+      cachedHost,
+      state.autoHost
+    )
+  ) {
+    const expiredHost = state.autoHost;
+    state.autoHost = "";
+    state.autoAttempted = false;
+    await removeRule(tabId);
+    appendEvent(tabId, {
+      kind: "expired-rule-released",
+      host: expiredHost
+    });
+    await pushDiagnostics(tabId);
+  }
   if (cachedHost && resultStatus === "fresh") {
     if (state.autoAttempted && state.autoHost === cachedHost) return;
     state.autoAttempted = true;
@@ -855,9 +946,10 @@ async function recoverFromPlaybackStall(tabId, details = {}) {
     return { switched: false, reason: "no-active-host" };
   }
 
-  if (!state.stalledHosts.includes(currentHost)) {
-    state.stalledHosts.push(currentHost);
-  }
+  state.stalledHosts = retainRecentStalledHosts(
+    [...state.stalledHosts, currentHost],
+    MAX_BENCHMARK_HOSTS
+  );
   await rememberPlaybackFailure(currentHost);
   await saveConfig({
     autoBestHost: "",
@@ -865,19 +957,39 @@ async function recoverFromPlaybackStall(tabId, details = {}) {
     autoBestSchema: BENCHMARK_SCHEMA
   });
 
-  const next = selectRecoveryBenchmark(
+  const recoveryPlan = planStallRecovery(
     state.benchmarks,
     currentHost,
     state.stalledHosts
   );
-  if (!next) {
+  const next = recoveryPlan.candidate;
+  if (recoveryPlan.kind === "origin") {
+    const fallbackAt = Date.now();
+    state.autoHost = "";
+    state.autoAttempted = false;
+    state.nextAutoRefreshCheckAt = 0;
+    await removeRule(tabId);
+    state.recoveryCount += 1;
+    state.lastRecovery = {
+      at: fallbackAt,
+      fromHost: currentHost,
+      host: "",
+      fallback: "origin"
+    };
     appendEvent(tabId, {
-      kind: "stall-exhausted",
+      kind: "stall-fallback",
       host: currentHost,
       atSecond: Number(details.currentTime) || 0
     });
     await pushDiagnostics(tabId);
-    return { switched: false, reason: "no-alternative", fromHost: currentHost };
+    return {
+      switched: true,
+      fallback: "origin",
+      retryBenchmark: recoveryPlan.retryBenchmark,
+      fromHost: currentHost,
+      host: "",
+      recoveryCount: state.recoveryCount
+    };
   }
 
   state.autoHost = next.host;
@@ -947,6 +1059,7 @@ async function publicState(tabId, pageUrl = "") {
     autoResultTtlMs: autoRefreshPolicy.hardTtlMs,
     autoRefreshProfiles: Object.values(AUTO_REFRESH_PROFILES),
     autoResultStatus: autoResultStatus(config),
+    sampleKind: state.videoSampleUrl ? "video" : "media",
     discoveredCount: playurlHosts(state).length,
     candidates,
     recoveryCount: state.recoveryCount,
@@ -1035,7 +1148,11 @@ async function handleMessage(message, sender) {
     if (!Number.isInteger(tabId)) return { ok: false };
     const state = updatePageState(tabId, sender.tab?.url || "");
     if (!state.playback) return { ok: false };
-    const hosts = observePlayurlUrls(tabId, message.urls);
+    const hosts = observePlayurlUrls(
+      tabId,
+      message.urls,
+      message.videoUrls
+    );
     await pushDiagnostics(tabId);
     return { ok: true, hosts: hosts.length };
   }
@@ -1092,7 +1209,9 @@ async function handleMessage(message, sender) {
       return publicState(tabId);
     }
     case "RUN_BENCHMARK":
-      await runBenchmark(tabId, message.hosts || null);
+      await runBenchmark(tabId, message.hosts || null, {
+        preserveStalledHosts: Boolean(message.preserveStalledHosts)
+      });
       return publicState(tabId);
     case "PLAYBACK_STALL":
       return recoverFromPlaybackStall(tabId, message);

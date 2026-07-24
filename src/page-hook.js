@@ -35,10 +35,14 @@
 
   const collectMediaUrls = (value) => {
     const output = [];
+    const videoOutput = [];
+    const audioOutput = [];
     const seenObjects = new WeakSet();
     const seenUrls = new Set();
+    const seenVideoUrls = new Set();
+    const seenAudioUrls = new Set();
 
-    const visit = (item, depth = 0) => {
+    const visit = (item, depth = 0, mediaKind = "") => {
       if (depth > 20 || item == null) return;
       if (typeof item === "string") {
         try {
@@ -56,6 +60,19 @@
             seenUrls.add(url.href);
             output.push(url.href);
           }
+          if (
+            mediaKind === "video" &&
+            !seenVideoUrls.has(url.href)
+          ) {
+            seenVideoUrls.add(url.href);
+            videoOutput.push(url.href);
+          } else if (
+            mediaKind === "audio" &&
+            !seenAudioUrls.has(url.href)
+          ) {
+            seenAudioUrls.add(url.href);
+            audioOutput.push(url.href);
+          }
         } catch {
           // Ignore non-URL strings in the playinfo payload.
         }
@@ -64,22 +81,34 @@
       if (typeof item !== "object" || seenObjects.has(item)) return;
       seenObjects.add(item);
       if (Array.isArray(item)) {
-        item.forEach((entry) => visit(entry, depth + 1));
+        item.forEach((entry) => visit(entry, depth + 1, mediaKind));
         return;
       }
-      Object.values(item).forEach((entry) => visit(entry, depth + 1));
+      Object.entries(item).forEach(([key, entry]) => {
+        const nextKind =
+          key === "video"
+            ? "video"
+            : key === "audio"
+              ? "audio"
+              : mediaKind;
+        visit(entry, depth + 1, nextKind);
+      });
     };
 
     visit(value);
-    return output.slice(0, 80);
+    return {
+      urls: output.slice(0, 80),
+      videoUrls: videoOutput.slice(0, 80),
+      audioUrls: audioOutput.slice(0, 80)
+    };
   };
 
   const publish = (playInfo) => {
-    const urls = collectMediaUrls(playInfo);
-    if (!urls.length) return;
+    const media = collectMediaUrls(playInfo);
+    if (!media.urls.length) return;
     document.dispatchEvent(
       new CustomEvent(eventName, {
-        detail: { urls }
+        detail: media
       })
     );
   };
