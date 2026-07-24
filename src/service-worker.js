@@ -11,6 +11,7 @@ import {
   isPlaybackUrl,
   isSupportedMediaUrl,
   makeProbeRange,
+  normalizeCdnHosts,
   planStallRecovery,
   playbackPageKey,
   replaceMediaHost,
@@ -53,6 +54,7 @@ const DEFAULT_CONFIG = Object.freeze({
   mode: "auto",
   manualHost: BUILTIN_CANDIDATES[0].host,
   customHosts: [],
+  disabledHosts: [],
   autoBestHost: "",
   autoBestAt: 0,
   autoBestSchema: 0,
@@ -100,6 +102,8 @@ async function getConfig() {
   const config = { ...DEFAULT_CONFIG, ...(stored[CONFIG_KEY] || {}) };
   return {
     ...config,
+    customHosts: normalizeCdnHosts(config.customHosts),
+    disabledHosts: normalizeCdnHosts(config.disabledHosts),
     autoRefreshProfile: resolveAutoRefreshProfile(
       config.autoRefreshProfile
     ).id
@@ -115,9 +119,11 @@ async function saveConfig(patch) {
 
 function freshAutoHost(config) {
   const validation = validateCdnHost(config.autoBestHost || "");
+  const disabled = new Set(config.disabledHosts || []);
   const policy = resolveAutoRefreshProfile(config.autoRefreshProfile);
   return (
     validation.ok &&
+    !disabled.has(validation.host) &&
     config.autoBestSchema === BENCHMARK_SCHEMA &&
     Number.isFinite(config.autoBestAt) &&
     Date.now() - config.autoBestAt < policy.hardTtlMs
@@ -128,8 +134,10 @@ function freshAutoHost(config) {
 
 function autoResultStatus(config) {
   const validation = validateCdnHost(config.autoBestHost || "");
+  const disabled = new Set(config.disabledHosts || []);
   if (
     !validation.ok ||
+    disabled.has(validation.host) ||
     config.autoBestSchema !== BENCHMARK_SCHEMA
   ) {
     return "expired";
@@ -296,7 +304,8 @@ async function candidatesFor(config, state) {
     config.customHosts,
     observedCandidate,
     playurlHosts(state),
-    learnedCandidates(health)
+    learnedCandidates(health),
+    config.disabledHosts
   );
 }
 
@@ -334,11 +343,13 @@ async function applyRule(tabId) {
   const targetHost =
     config.mode === "auto" ? state.autoHost : config.manualHost;
   const validation = validateCdnHost(targetHost || "");
+  const disabled = new Set(config.disabledHosts || []);
   const shouldEnable =
     config.enabled &&
     state.playback &&
     isPlaybackUrl(state.pageUrl) &&
-    validation.ok;
+    validation.ok &&
+    !disabled.has(validation.host);
 
   if (!shouldEnable) {
     await removeRule(tabId);
@@ -693,8 +704,10 @@ async function runBenchmark(
     ? new Set(requestedHosts)
     : null;
   const eligible = requested
-    ? allCandidates.filter((item) => requested.has(item.host))
-    : allCandidates;
+    ? allCandidates.filter(
+        (item) => !item.disabled && requested.has(item.host)
+      )
+    : allCandidates.filter((item) => !item.disabled);
   const candidates = chooseBenchmarkCandidates(
     eligible,
     config.autoBestHost,
@@ -797,7 +810,13 @@ async function runBenchmark(
       best = chooseAutoBenchmark(results, config.autoBestHost);
     }
     const freshConfig = await getConfig();
-    if (freshConfig.enabled && freshConfig.mode === "auto" && best) {
+    const disabled = new Set(freshConfig.disabledHosts || []);
+    if (best && disabled.has(best.host)) best = null;
+    if (
+      freshConfig.enabled &&
+      freshConfig.mode === "auto" &&
+      best
+    ) {
       state.autoHost = best.host;
       await saveConfig({
         autoBestHost: best.host,
@@ -957,8 +976,9 @@ async function recoverFromPlaybackStall(tabId, details = {}) {
     autoBestSchema: BENCHMARK_SCHEMA
   });
 
+  const disabled = new Set(config.disabledHosts || []);
   const recoveryPlan = planStallRecovery(
-    state.benchmarks,
+    state.benchmarks.filter((item) => !disabled.has(item.host)),
     currentHost,
     state.stalledHosts
   );
@@ -1204,6 +1224,10 @@ async function handleMessage(message, sender) {
     case "SET_TARGET": {
       const validation = validateCdnHost(message.host);
       if (!validation.ok) throw new Error(validation.error);
+      const config = await getConfig();
+      if (config.disabledHosts.includes(validation.host)) {
+        throw new Error("这个节点已禁用，请先重新启用");
+      }
       await saveConfig({ manualHost: validation.host, mode: "manual" });
       await applyToKnownPlaybackTabs();
       return publicState(tabId);
@@ -1221,6 +1245,38 @@ async function handleMessage(message, sender) {
       const config = await getConfig();
       const customHosts = [...new Set([...config.customHosts, validation.host])];
       await saveConfig({ customHosts });
+      return publicState(tabId);
+    }
+    case "SET_HOST_DISABLED": {
+      const validation = validateCdnHost(message.host);
+      if (!validation.ok) throw new Error(validation.error);
+      const disabled = Boolean(message.disabled);
+      const config = await getConfig();
+      const disabledHosts = new Set(config.disabledHosts);
+      if (disabled) {
+        disabledHosts.add(validation.host);
+      } else {
+        disabledHosts.delete(validation.host);
+      }
+      const patch = {
+        disabledHosts: [...disabledHosts]
+      };
+      if (disabled && config.autoBestHost === validation.host) {
+        patch.autoBestHost = "";
+        patch.autoBestAt = 0;
+        patch.autoBestSchema = BENCHMARK_SCHEMA;
+      }
+      await saveConfig(patch);
+      if (disabled) {
+        for (const state of tabStates.values()) {
+          if (state.autoHost !== validation.host) continue;
+          state.autoHost = "";
+          state.autoAttempted = false;
+          state.nextAutoRefreshCheckAt = 0;
+        }
+      }
+      await applyToKnownPlaybackTabs();
+      if (disabled) await maybeRunAuto(tabId);
       return publicState(tabId);
     }
     default:

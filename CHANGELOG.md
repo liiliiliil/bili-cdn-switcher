@@ -4,7 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-- Nothing yet.
+- Keep disabled CDN hosts, labels and historical benchmark results visible
+  while excluding them from benchmarks, automatic selection and stall recovery.
+- Release an active redirect rule immediately when its target is disabled.
+- Allow any disabled candidate to be re-enabled from the popup without
+  deleting or rebuilding its local history.
 
 ## [1.7.1] - 2026-07-24
 

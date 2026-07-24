@@ -49,6 +49,19 @@ export function validateCdnHost(value) {
   return { ok: true, host };
 }
 
+export function normalizeCdnHosts(values) {
+  if (!Array.isArray(values)) return [];
+  const hosts = [];
+  const seen = new Set();
+  for (const value of values) {
+    const validation = validateCdnHost(value);
+    if (!validation.ok || seen.has(validation.host)) continue;
+    seen.add(validation.host);
+    hosts.push(validation.host);
+  }
+  return hosts;
+}
+
 export function isBilibiliHost(value) {
   try {
     const host = value.includes("://") ? new URL(value).hostname : value;
@@ -180,10 +193,12 @@ export function uniqueCandidates(
   customHosts = [],
   observedHost = "",
   playurlHosts = [],
-  learnedHosts = []
+  learnedHosts = [],
+  disabledHosts = []
 ) {
   const output = [];
   const seen = new Set();
+  const disabled = new Set(normalizeCdnHosts(disabledHosts));
 
   const add = (item, source) => {
     const rawHost = typeof item === "string" ? item : item.host;
@@ -204,7 +219,8 @@ export function uniqueCandidates(
               custom: "自定义候选",
               learned: "近期播放中学习"
             }[source] || "候选节点",
-      source
+      source,
+      disabled: disabled.has(validation.host)
     });
   };
 
@@ -233,6 +249,7 @@ export function chooseBenchmarkCandidates(
     learned: 4
   };
   return candidates
+    .filter((candidate) => !candidate.disabled)
     .map((candidate, index) => ({
       candidate,
       index,

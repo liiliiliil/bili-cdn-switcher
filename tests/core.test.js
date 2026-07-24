@@ -13,6 +13,7 @@ import {
   isPlaybackUrl,
   isSupportedMediaUrl,
   makeProbeRange,
+  normalizeCdnHosts,
   planStallRecovery,
   playbackPageKey,
   replaceMediaHost,
@@ -74,6 +75,19 @@ test("只接受 bilivideo.com 子域名作为目标", () => {
   assert.equal(validateCdnHost("bilivideo.com").ok, false);
   assert.equal(validateCdnHost("https://a.bilivideo.com/path").ok, false);
   assert.equal(validateCdnHost("a.bilivideo.com:443").ok, false);
+});
+
+test("禁用名单只保留合法且去重后的 bilivideo host", () => {
+  assert.deepEqual(
+    normalizeCdnHosts([
+      "A.BILIVIDEO.COM",
+      "a.bilivideo.com",
+      "evil.example",
+      null
+    ]),
+    ["a.bilivideo.com"]
+  );
+  assert.deepEqual(normalizeCdnHosts("a.bilivideo.com"), []);
 });
 
 test("媒体 URL 替换只改变 scheme 和 host", () => {
@@ -224,6 +238,31 @@ test("每轮测速数量封顶，并优先保留缓存最佳与当前签发节�
       "signed.bilivideo.com",
       "custom.bilivideo.com"
     ]
+  );
+});
+
+test("禁用候选保留在列表中，但不会进入测速窗口", () => {
+  const candidates = uniqueCandidates(
+    [{ host: "builtin.bilivideo.com", label: "内置" }],
+    ["custom.bilivideo.com"],
+    "observed.bilivideo.com",
+    [],
+    [],
+    ["custom.bilivideo.com", "observed.bilivideo.com"]
+  );
+  assert.equal(
+    candidates.find((item) => item.host === "custom.bilivideo.com").disabled,
+    true
+  );
+  assert.equal(
+    candidates.find((item) => item.host === "builtin.bilivideo.com").disabled,
+    false
+  );
+  assert.deepEqual(
+    chooseBenchmarkCandidates(candidates, "custom.bilivideo.com", 8).map(
+      (item) => item.host
+    ),
+    ["builtin.bilivideo.com"]
   );
 });
 

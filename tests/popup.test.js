@@ -26,3 +26,10 @@ test("弹窗通过后台消息保存自动重新优选档位", () => {
   assert.match(popupScript, /SET_AUTO_REFRESH_PROFILE/);
   assert.match(popupScript, /profile: elements\.autoRefreshProfile\.value/);
 });
+
+test("弹窗可以禁用和重新启用候选，而不是删除记录", () => {
+  assert.match(popupScript, /SET_HOST_DISABLED/);
+  assert.match(popupScript, /candidate\.disabled \? "重新启用" : "禁用"/);
+  assert.match(popupScript, /不参与测速和切换/);
+  assert.doesNotMatch(popupScript, /DELETE_CUSTOM_HOST/);
+});

@@ -66,6 +66,7 @@ function renderCandidates() {
     const row = document.createElement("div");
     row.className = "candidate";
     if (currentState.activeHost === candidate.host) row.classList.add("selected");
+    if (candidate.disabled) row.classList.add("disabled");
 
     const info = document.createElement("div");
     const title = document.createElement("div");
@@ -87,6 +88,12 @@ function renderCandidates() {
       const tag = document.createElement("span");
       tag.className = "tag stalled";
       tag.textContent = "播放卡顿";
+      title.append(tag);
+    }
+    if (candidate.disabled) {
+      const tag = document.createElement("span");
+      tag.className = "tag disabled";
+      tag.textContent = "已禁用";
       title.append(tag);
     }
     title.title = candidate.note || "";
@@ -115,6 +122,11 @@ function renderCandidates() {
           ? ` · 短测 ${result.burstMbps}`
           : "");
       resultBox.append(speed, latency);
+    } else if (candidate.disabled) {
+      const disabled = document.createElement("span");
+      disabled.className = "latency";
+      disabled.textContent = "不参与测速和切换";
+      resultBox.append(disabled);
     } else if (currentState.config.mode !== "manual") {
       const waiting = document.createElement("span");
       waiting.className = "latency";
@@ -130,6 +142,7 @@ function renderCandidates() {
         currentState.config.manualHost === candidate.host ? "已选择" : "使用";
       useButton.disabled =
         !currentState.applicable ||
+        candidate.disabled ||
         currentState.config.manualHost === candidate.host;
       useButton.addEventListener("click", async () => {
         await perform(async () => send("SET_TARGET", { host: candidate.host }));
@@ -137,9 +150,29 @@ function renderCandidates() {
       resultBox.append(useButton);
     }
 
+    const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "toggle-button";
+    toggleButton.textContent = candidate.disabled ? "重新启用" : "禁用";
+    toggleButton.title = candidate.disabled
+      ? "恢复参与测速、优选和切换"
+      : "保留节点和历史成绩，但不再参与测速、优选和切换";
+    toggleButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await perform(
+        () =>
+          send("SET_HOST_DISABLED", {
+            host: candidate.host,
+            disabled: !candidate.disabled
+          }),
+        candidate.disabled ? "已重新启用节点" : "已禁用节点"
+      );
+    });
+    resultBox.append(toggleButton);
+
     row.append(info, resultBox);
     row.addEventListener("dblclick", async () => {
-      if (currentState.applicable) {
+      if (currentState.applicable && !candidate.disabled) {
         await perform(async () => send("SET_TARGET", { host: candidate.host }));
       }
     });
@@ -211,17 +244,24 @@ function render() {
     currentState.sampleKind === "video"
       ? "当前按实际视频轨测速；"
       : "";
+  const disabledCount = currentState.config.disabledHosts?.length || 0;
+  const disabledLabel = disabledCount
+    ? `已禁用 ${disabledCount} 个候选；`
+    : "";
   elements.benchmarkHint.textContent =
     `已从当前播放接口发现 ${currentState.discoveredCount || 0} 个 host；` +
     sampleLabel +
+    disabledLabel +
     `先用 ${quickKb || 128} KB 初筛最多 ${currentState.benchmarkLimit || 8} 个，` +
     `再用 ${sustainedMb || 1} MB 复测前 ${currentState.sustainedFinalists || 3} 个。` +
     `${profileLabel}档下，自动结果 ${softDuration}后仅在可见播放且缓冲安全时按需复测，` +
     `${hardDuration}后失效。`;
 
+  const disabledHosts = new Set(currentState.config.disabledHosts || []);
   const activeSustained = (currentState.benchmarks || []).find(
     (item) =>
       item?.host === currentState.activeHost &&
+      !disabledHosts.has(item.host) &&
       item.ok &&
       item.stage === "sustained" &&
       Number.isFinite(item.mbps)
@@ -230,6 +270,7 @@ function render() {
     .filter(
       (item) =>
         item?.ok &&
+        !disabledHosts.has(item.host) &&
         item.stage === "sustained" &&
         Number.isFinite(item.mbps) &&
         !(currentState.stalledHosts || []).includes(item.host)

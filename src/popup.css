@@ -290,6 +290,11 @@ input:disabled {
   box-shadow: inset 3px 0 #00a1d6;
 }
 
+.candidate.disabled {
+  border-style: dashed;
+  background: #f7f9fa;
+}
+
 .candidate-title {
   display: flex;
   gap: 6px;
@@ -310,6 +315,11 @@ input:disabled {
 .tag.stalled {
   color: #9b511f;
   background: #fff0df;
+}
+
+.tag.disabled {
+  color: #68737b;
+  background: #e9edef;
 }
 
 .candidate-host {
@@ -350,7 +360,8 @@ input:disabled {
   font-size: 9px;
 }
 
-.use-button {
+.use-button,
+.toggle-button {
   display: block;
   margin-top: 5px;
   margin-left: auto;
@@ -361,6 +372,23 @@ input:disabled {
   background: #f0fbfe;
   font-size: 10px;
   font-weight: 700;
+}
+
+.toggle-button {
+  border-color: #d9e1e5;
+  color: #66737d;
+  background: #f7f9fa;
+}
+
+.candidate.disabled .toggle-button {
+  border-color: #caeaf4;
+  color: #007da7;
+  background: #f0fbfe;
+}
+
+.candidate.disabled .speed,
+.candidate.disabled .latency {
+  color: #7c888f;
 }
 
 details {

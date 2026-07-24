@@ -51,3 +51,13 @@ test("切换恢复会跨过播放器 seek 容差并在重新测速后再试一�
     /preserveStalledHosts: true/
   );
 });
+
+test("禁用节点会退出测速、规则和卡顿恢复候选", () => {
+  assert.match(serviceWorker, /allCandidates\.filter\(\(item\) => !item\.disabled\)/);
+  assert.match(
+    serviceWorker,
+    /state\.benchmarks\.filter\(\(item\) => !disabled\.has\(item\.host\)\)/
+  );
+  assert.match(serviceWorker, /case "SET_HOST_DISABLED"/);
+  assert.match(serviceWorker, /!disabled\.has\(validation\.host\)/);
+});
