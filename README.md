@@ -14,7 +14,7 @@ Bili CDN Switcher 会在当前视频可用的 `bilivideo.com` 地址中做一轮
 
 ![扩展界面与核心功能](assets/store/screenshot-01-overview-1280x800.png)
 
-当前 dogfood 版本：**v1.8.0**；正式发布版仍为 **v1.7.1**。正式包可从 GitHub Releases 下载；Chrome Web Store 版本正在准备中。商店上线前仍需用开发者模式安装。
+当前版本：**v1.8.0**。正式包可从 GitHub Releases 下载；Chrome Web Store 首次上架正在提交审核，商店上线前仍可用开发者模式安装。
 
 ## 安装
 

@@ -82,17 +82,23 @@
     <rect x="81" y="428" width="34" height="16" rx="4" fill="#E6F7FC"/>
     <text x="88" y="440" fill="#007DA7" font-size="9">复测</text>
     <text x="13" y="464" fill="#697680" font-size="10" font-family="ui-monospace, Menlo, monospace">upos-example-b.bilivideo.com</text>
-    <text x="318" y="445" fill="#168957" font-size="13" font-weight="800">6.8 MB/s</text>
-    <text x="340" y="466" fill="#8A959D" font-size="9">86 ms</text>
+    <text x="286" y="445" fill="#168957" font-size="13" font-weight="800">6.8 MB/s</text>
+    <text x="310" y="466" fill="#8A959D" font-size="9">86 ms</text>
+    <rect x="350" y="432" width="40" height="24" rx="7" fill="#F7F9FA" stroke="#D9E1E5"/>
+    <text x="360" y="448" fill="#66737D" font-size="9" font-weight="750">禁用</text>
 
-    <rect x="0" y="502" width="402" height="75" rx="12" fill="#FFFFFF" stroke="#DFE7ED"/>
-    <text x="13" y="525" fill="#17212B" font-size="12" font-weight="750">当前分配</text>
+    <rect x="0" y="502" width="402" height="75" rx="12" fill="#F7F9FA" stroke="#D9E1E5" stroke-dasharray="4 3"/>
+    <text x="13" y="525" fill="#17212B" font-size="12" font-weight="750">备用候选</text>
+    <rect x="79" y="513" width="43" height="16" rx="4" fill="#E9EDEF"/>
+    <text x="85" y="525" fill="#68737B" font-size="9">已禁用</text>
     <text x="13" y="549" fill="#697680" font-size="10" font-family="ui-monospace, Menlo, monospace">upos-example-a.bilivideo.com</text>
-    <text x="318" y="530" fill="#168957" font-size="13" font-weight="800">3.1 MB/s</text>
-    <text x="340" y="551" fill="#8A959D" font-size="9">122 ms</text>
+    <text x="274" y="530" fill="#7C888F" font-size="13" font-weight="800">3.1 MB/s</text>
+    <text x="299" y="551" fill="#8A959D" font-size="9">122 ms</text>
+    <rect x="333" y="516" width="57" height="24" rx="7" fill="#F0FBFE" stroke="#CAEAF4"/>
+    <text x="341" y="532" fill="#007DA7" font-size="9" font-weight="750">重新启用</text>
 
     <line x1="0" y1="622" x2="402" y2="622" stroke="#E0E6EA"/>
-    <text x="0" y="649" fill="#89949D" font-size="10">不使用全局代理 · 不上传数据 · v1.7.0</text>
+    <text x="0" y="649" fill="#89949D" font-size="10">不使用全局代理 · 不上传数据 · v1.8.0</text>
     <text x="370" y="649" fill="#607987" font-size="10">说明</text>
   </g>
 

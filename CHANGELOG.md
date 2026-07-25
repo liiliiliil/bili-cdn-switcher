@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.8.0] - 2026-07-25
+
 - Keep disabled CDN hosts, labels and historical benchmark results visible
   while excluding them from benchmarks, automatic selection and stall recovery.
 - Release an active redirect rule immediately when its target is disabled.
@@ -52,7 +56,8 @@ All notable changes to this project are documented here.
 
 - Added two-stage Range benchmarking, bounded dynamic host learning and playback-stall recovery.
 
-[Unreleased]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/liiliiliil/bili-cdn-switcher/releases/tag/v1.6.0

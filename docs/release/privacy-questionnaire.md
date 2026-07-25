@@ -14,7 +14,7 @@
 
 ### `storage`
 
-在 `chrome.storage.local` 保存启停、自动/手动模式、自动重新优选档位、自定义 host，以及有数量和期限上限的本地节点表现摘要。数据不上传，也不使用 `storage.sync`。
+在 `chrome.storage.local` 保存启停、自动/手动模式、自动重新优选档位、自定义或暂时禁用的 host，以及有数量和期限上限的本地节点表现摘要。数据不上传，也不使用 `storage.sync`。
 
 ### `webRequest`
 
