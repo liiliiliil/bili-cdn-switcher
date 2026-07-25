@@ -6,6 +6,7 @@
 - [隐私字段与权限说明](privacy-questionnaire.md)
 - [审核测试说明](reviewer-test-instructions.md)
 - [发布检查清单](release-checklist.md)
+- [Chrome Web Store 提交记录](chrome-web-store-submission.md)
 
 对应图片在 `assets/store/`：
 
