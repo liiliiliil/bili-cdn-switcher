@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bili CDN Switcher - B站视频 CDN 优选器",
-  "version": "1.8.0",
+  "version": "1.8.4",
   "description": "为 B 站点播视频在本机测速并切换 bilivideo.com CDN；无需全局代理，不上传数据。",
   "homepage_url": "https://github.com/liiliiliil/bili-cdn-switcher",
   "minimum_chrome_version": "111",
@@ -58,6 +58,7 @@
         "https://m.bilibili.com/bangumi/play/*"
       ],
       "js": [
+        "src/playback-health.js",
         "src/content.js"
       ],
       "run_at": "document_start"

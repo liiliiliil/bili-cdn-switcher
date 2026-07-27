@@ -7,9 +7,19 @@
     extensionManifest.version_name || extensionManifest.version;
   const maxAllowedSampleBytes = 1024 * 1024;
   const stallConfirmMs = 4500;
+  const urgentStallConfirmMs = 2500;
   const stallCooldownMs = 15000;
+  const hostSwitchGraceMs = 7000;
+  const healthSampleIntervalMs = 2000;
+  const preemptiveConfirmMs = 1500;
+  const maximumHealthSamples = 10;
+  const playbackHealth = globalThis.BiliCdnPlaybackHealth;
   let stallTimer = 0;
   let lastStallReportAt = 0;
+  let lastStallHost = "";
+  let preemptiveTimer = 0;
+  let healthVideo = null;
+  let healthSamples = [];
 
   // Harmless local marker for verifying an unpacked-extension reload.
   document.documentElement.dataset.bilibiliCdnSwitcherVersion =
@@ -198,14 +208,18 @@
     return results;
   };
 
-  const playbackActivity = () => {
+  const primaryVideo = () => {
     const videos = [...document.querySelectorAll("video")];
-    const video = videos
+    return videos
       .map((item) => ({
         item,
         area: Math.max(item.clientWidth, 0) * Math.max(item.clientHeight, 0)
       }))
       .sort((a, b) => b.area - a.area)[0]?.item;
+  };
+
+  const playbackActivity = () => {
+    const video = primaryVideo();
     if (!(video instanceof HTMLVideoElement)) {
       return {
         visible: document.visibilityState === "visible",
@@ -306,6 +320,140 @@
     stallTimer = 0;
   };
 
+  const resetPlaybackHealth = (video = null) => {
+    clearTimeout(preemptiveTimer);
+    preemptiveTimer = 0;
+    healthSamples = [];
+    healthVideo = video;
+  };
+
+  const autoRecoveryEnabled = () => {
+    const status = document.documentElement.dataset;
+    return (
+      status.bilibiliCdnSwitcherEnabled === "true" &&
+      status.bilibiliCdnSwitcherMode === "auto" &&
+      status.bilibiliCdnSwitcherRuleActive === "true"
+    );
+  };
+
+  const healthSample = (video) => ({
+    at: performance.now(),
+    currentTime: Number(video.currentTime) || 0,
+    bufferedAhead: Number(bufferedAhead(video).toFixed(3)),
+    visible: document.visibilityState === "visible",
+    playing: !video.paused && !video.ended,
+    seeking: video.seeking
+  });
+
+  const requestStallRecovery = (video, reason) => {
+    if (
+      !(video instanceof HTMLVideoElement) ||
+      video.paused ||
+      video.ended ||
+      video.currentTime <= 0 ||
+      document.visibilityState !== "visible"
+    ) {
+      return { sent: false, cooldownRemaining: 0 };
+    }
+
+    const now = Date.now();
+    const currentHost =
+      document.documentElement.dataset.bilibiliCdnSwitcherActiveHost ||
+      "origin";
+    const cooldownRemaining =
+      playbackHealth?.recoveryCooldownRemaining?.({
+        now,
+        lastAt: lastStallReportAt,
+        currentHost,
+        lastHost: lastStallHost,
+        cooldownMs: stallCooldownMs,
+        minimumIntervalMs: hostSwitchGraceMs
+      }) || 0;
+    if (cooldownRemaining > 0) {
+      return { sent: false, cooldownRemaining };
+    }
+
+    lastStallReportAt = now;
+    lastStallHost = currentHost;
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "PLAYBACK_STALL",
+          extensionVersion,
+          reason,
+          currentTime: Number(video.currentTime.toFixed(3)),
+          readyState: video.readyState,
+          bufferedAhead: Number(bufferedAhead(video).toFixed(3))
+        },
+        (response) => {
+          if (
+            chrome.runtime.lastError ||
+            !response?.ok ||
+            !video.isConnected
+          ) {
+            return;
+          }
+          const recovery = response.data;
+          if (!recovery?.switched) {
+            const retryAfterMs = Number(recovery?.retryAfterMs) || 0;
+            if (retryAfterMs > 0) {
+              scheduleStallCheck(video, retryAfterMs);
+            }
+            return;
+          }
+          resetPlaybackHealth(video);
+          const recoveryTarget =
+            recovery.fallback === "origin"
+              ? "origin"
+              : recovery.host || "";
+          document.documentElement.dataset.bilibiliCdnSwitcherActiveHost =
+            recovery.fallback === "origin" ? "" : recovery.host || "";
+          document.documentElement.dataset.bilibiliCdnSwitcherLastRecovery =
+            `${recovery.fromHost || ""}->${recoveryTarget}`;
+          const retryPlayback = () => {
+            if (!video.isConnected || video.ended) return;
+            const resumeAt = Math.max(0, video.currentTime - 1);
+            try {
+              video.currentTime = resumeAt;
+              void video.play().catch(() => {});
+            } catch {
+              // The player can recover on its next retry even if seeking fails.
+            }
+          };
+          setTimeout(retryPlayback, 150);
+          if (recovery.retryBenchmark) {
+            setTimeout(() => {
+              try {
+                chrome.runtime.sendMessage(
+                  {
+                    type: "RUN_BENCHMARK",
+                    extensionVersion,
+                    preserveStalledHosts: true
+                  },
+                  (benchmarkResponse) => {
+                    if (
+                      chrome.runtime.lastError ||
+                      !benchmarkResponse?.ok
+                    ) {
+                      return;
+                    }
+                    setTimeout(retryPlayback, 50);
+                  }
+                );
+              } catch {
+                // A later playback request can retry automatic selection.
+              }
+            }, 250);
+          }
+        }
+      );
+      return { sent: true, cooldownRemaining: 0 };
+    } catch {
+      // An extension reload can invalidate an old content-script context.
+      return { sent: false, cooldownRemaining: 0 };
+    }
+  };
+
   const scheduleStallCheck = (video, delayMs = stallConfirmMs) => {
     cancelStallTimer();
     if (
@@ -319,7 +467,6 @@
     }
     stallTimer = setTimeout(() => {
       stallTimer = 0;
-      const now = Date.now();
       if (
         video.paused ||
         video.ended ||
@@ -329,76 +476,72 @@
       ) {
         return;
       }
-      const cooldownRemaining =
-        stallCooldownMs - (now - lastStallReportAt);
+      const { cooldownRemaining } = requestStallRecovery(
+        video,
+        "buffer-empty"
+      );
       if (cooldownRemaining > 0) {
         scheduleStallCheck(video, cooldownRemaining);
-        return;
-      }
-      lastStallReportAt = now;
-      try {
-        chrome.runtime.sendMessage(
-          {
-            type: "PLAYBACK_STALL",
-            extensionVersion,
-            currentTime: Number(video.currentTime.toFixed(3)),
-            readyState: video.readyState,
-            bufferedAhead: Number(bufferedAhead(video).toFixed(3))
-          },
-          (response) => {
-            if (chrome.runtime.lastError || !response?.ok) return;
-            const recovery = response.data;
-            if (!recovery?.switched || !video.isConnected) return;
-            const recoveryTarget =
-              recovery.fallback === "origin"
-                ? "origin"
-                : recovery.host || "";
-            document.documentElement.dataset.bilibiliCdnSwitcherLastRecovery =
-              `${recovery.fromHost || ""}->${recoveryTarget}`;
-            const retryPlayback = () => {
-              if (!video.isConnected || video.ended) return;
-              const resumeAt = Math.max(0, video.currentTime - 1);
-              try {
-                video.currentTime = resumeAt;
-                void video.play().catch(() => {});
-              } catch {
-                // The player can recover on its next retry even if seeking fails.
-              }
-            };
-            setTimeout(retryPlayback, 150);
-            if (recovery.retryBenchmark) {
-              setTimeout(() => {
-                try {
-                  chrome.runtime.sendMessage(
-                    {
-                      type: "RUN_BENCHMARK",
-                      extensionVersion,
-                      preserveStalledHosts: true
-                    },
-                    (benchmarkResponse) => {
-                      if (
-                        chrome.runtime.lastError ||
-                        !benchmarkResponse?.ok
-                      ) {
-                        return;
-                      }
-                      setTimeout(retryPlayback, 50);
-                    }
-                  );
-                } catch {
-                  // A later playback request can retry automatic selection.
-                }
-              }, 250);
-            }
-          }
-        );
-      } catch {
-        // An extension reload can invalidate an old content-script context.
       }
     }, Math.max(Number(delayMs) || stallConfirmMs, 250));
   };
 
-  ["waiting", "stalled", "seeking", "play", "seeked"].forEach(
+  const samplePlaybackHealth = () => {
+    if (!playbackHealth?.shouldPreemptivelyRecover) return;
+    const video = primaryVideo();
+    if (video !== healthVideo) resetPlaybackHealth(video);
+    if (
+      !(video instanceof HTMLVideoElement) ||
+      !autoRecoveryEnabled() ||
+      video.paused ||
+      video.ended ||
+      video.seeking ||
+      video.currentTime <= 0 ||
+      document.visibilityState !== "visible"
+    ) {
+      resetPlaybackHealth(video);
+      return;
+    }
+
+    healthSamples.push(healthSample(video));
+    healthSamples = healthSamples.slice(-maximumHealthSamples);
+    if (
+      preemptiveTimer ||
+      !playbackHealth.shouldPreemptivelyRecover(healthSamples)
+    ) {
+      return;
+    }
+
+    preemptiveTimer = setTimeout(() => {
+      preemptiveTimer = 0;
+      if (
+        video !== primaryVideo() ||
+        video.paused ||
+        video.ended ||
+        video.seeking ||
+        document.visibilityState !== "visible"
+      ) {
+        resetPlaybackHealth(video);
+        return;
+      }
+      healthSamples.push(healthSample(video));
+      healthSamples = healthSamples.slice(-maximumHealthSamples);
+      if (playbackHealth.shouldPreemptivelyRecover(healthSamples)) {
+        requestStallRecovery(video, "buffer-draining");
+      }
+    }, preemptiveConfirmMs);
+  };
+
+  ["waiting", "stalled"].forEach(
+    (type) =>
+      document.addEventListener(
+        type,
+        (event) =>
+          scheduleStallCheck(event.target, urgentStallConfirmMs),
+        true
+      )
+  );
+  ["seeking", "play", "seeked"].forEach(
     (type) =>
       document.addEventListener(
         type,
@@ -410,6 +553,14 @@
     (type) =>
       document.addEventListener(type, cancelStallTimer, true)
   );
+  ["seeking", "pause", "ended"].forEach((type) =>
+    document.addEventListener(
+      type,
+      (event) => resetPlaybackHealth(event.target),
+      true
+    )
+  );
+  setInterval(samplePlaybackHealth, healthSampleIntervalMs);
 
   document.addEventListener("bilibili-cdn-switcher:playurl", (event) => {
     try {
@@ -459,6 +610,9 @@
     if (type === "NAVIGATION") {
       latestPlayurlUrls = [];
       latestPlayurlVideoUrls = [];
+      resetPlaybackHealth();
+      lastStallReportAt = 0;
+      lastStallHost = "";
     }
     send({ type, url: location.href });
   };

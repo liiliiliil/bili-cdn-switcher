@@ -1,6 +1,6 @@
 {
   "name": "bili-cdn-switcher",
-  "version": "1.8.0",
+  "version": "1.8.4",
   "description": "Privacy-first Chromium MV3 extension that locally benchmarks and switches Bilibili video CDN hosts.",
   "private": true,
   "type": "module",
@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/core.js && node --check src/candidates.js && node --check src/page-hook.js && node --check src/content.js && node --check src/service-worker.js && node --check src/popup.js && node --check scripts/package-extension.mjs && node --test",
+    "check": "node --check src/core.js && node --check src/candidates.js && node --check src/page-hook.js && node --check src/playback-health.js && node --check src/content.js && node --check src/service-worker.js && node --check src/popup.js && node --check scripts/package-extension.mjs && node --test",
     "package": "node scripts/package-extension.mjs"
   }
 }

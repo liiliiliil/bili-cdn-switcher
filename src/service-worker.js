@@ -41,6 +41,7 @@ const RECENT_STALL_HOST_LIMIT = 3;
 const HOST_HEALTH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const AUTO_ACTIVITY_RETRY_MS = 30 * 1000;
 const AUTO_FAILURE_RETRY_MS = 5 * 60 * 1000;
+const MIN_RECOVERY_SWITCH_INTERVAL_MS = 7 * 1000;
 const tabStates = new Map();
 let autoRefreshOwnerTabId = null;
 
@@ -84,6 +85,7 @@ function stateFor(tabId) {
       benchmarks: [],
       stalledHosts: [],
       recoveryCount: 0,
+      recoveryInFlight: false,
       lastRecovery: null,
       events: []
     });
@@ -944,103 +946,131 @@ async function maybeRunAuto(tabId) {
 }
 
 async function recoverFromPlaybackStall(tabId, details = {}) {
-  const config = await getConfig();
   const state = stateFor(tabId);
-  if (
-    !config.enabled ||
-    config.mode !== "auto" ||
-    !state.playback ||
-    state.benchmarkRunning
-  ) {
-    return { switched: false, reason: "inactive" };
+  if (state.recoveryInFlight) {
+    return {
+      switched: false,
+      reason: "in-flight",
+      retryAfterMs: MIN_RECOVERY_SWITCH_INTERVAL_MS
+    };
   }
+  state.recoveryInFlight = true;
 
-  const rules = await chrome.declarativeNetRequest.getSessionRules();
-  const activeRule = rules.find((rule) => rule.id === ruleIdForTab(tabId));
-  const currentHost =
-    activeRule?.action?.redirect?.transform?.host ||
-    state.autoHost ||
-    "";
-  if (!currentHost) {
-    return { switched: false, reason: "no-active-host" };
-  }
+  try {
+    const config = await getConfig();
+    if (
+      !config.enabled ||
+      config.mode !== "auto" ||
+      !state.playback ||
+      state.benchmarkRunning
+    ) {
+      return { switched: false, reason: "inactive" };
+    }
 
-  state.stalledHosts = retainRecentStalledHosts(
-    [...state.stalledHosts, currentHost],
-    MAX_BENCHMARK_HOSTS
-  );
-  await rememberPlaybackFailure(currentHost);
-  await saveConfig({
-    autoBestHost: "",
-    autoBestAt: 0,
-    autoBestSchema: BENCHMARK_SCHEMA
-  });
+    const now = Date.now();
+    const lastRecoveryAt = Number(state.lastRecovery?.at) || 0;
+    const elapsedSinceRecovery = now - lastRecoveryAt;
+    if (
+      lastRecoveryAt > 0 &&
+      elapsedSinceRecovery < MIN_RECOVERY_SWITCH_INTERVAL_MS
+    ) {
+      return {
+        switched: false,
+        reason: "cooldown",
+        retryAfterMs:
+          MIN_RECOVERY_SWITCH_INTERVAL_MS - elapsedSinceRecovery
+      };
+    }
 
-  const disabled = new Set(config.disabledHosts || []);
-  const recoveryPlan = planStallRecovery(
-    state.benchmarks.filter((item) => !disabled.has(item.host)),
-    currentHost,
-    state.stalledHosts
-  );
-  const next = recoveryPlan.candidate;
-  if (recoveryPlan.kind === "origin") {
-    const fallbackAt = Date.now();
-    state.autoHost = "";
-    state.autoAttempted = false;
-    state.nextAutoRefreshCheckAt = 0;
-    await removeRule(tabId);
+    const rules = await chrome.declarativeNetRequest.getSessionRules();
+    const activeRule = rules.find((rule) => rule.id === ruleIdForTab(tabId));
+    const currentHost =
+      activeRule?.action?.redirect?.transform?.host ||
+      state.autoHost ||
+      "";
+    if (!currentHost) {
+      return { switched: false, reason: "no-active-host" };
+    }
+
+    state.stalledHosts = retainRecentStalledHosts(
+      [...state.stalledHosts, currentHost],
+      MAX_BENCHMARK_HOSTS
+    );
+    await rememberPlaybackFailure(currentHost);
+    await saveConfig({
+      autoBestHost: "",
+      autoBestAt: 0,
+      autoBestSchema: BENCHMARK_SCHEMA
+    });
+
+    const disabled = new Set(config.disabledHosts || []);
+    const recoveryPlan = planStallRecovery(
+      state.benchmarks.filter((item) => !disabled.has(item.host)),
+      currentHost,
+      state.stalledHosts
+    );
+    const next = recoveryPlan.candidate;
+    if (recoveryPlan.kind === "origin") {
+      const fallbackAt = Date.now();
+      state.autoHost = "";
+      state.autoAttempted = false;
+      state.nextAutoRefreshCheckAt = 0;
+      await removeRule(tabId);
+      state.recoveryCount += 1;
+      state.lastRecovery = {
+        at: fallbackAt,
+        fromHost: currentHost,
+        host: "",
+        fallback: "origin"
+      };
+      appendEvent(tabId, {
+        kind: "stall-fallback",
+        host: currentHost,
+        atSecond: Number(details.currentTime) || 0
+      });
+      await pushDiagnostics(tabId);
+      return {
+        switched: true,
+        fallback: "origin",
+        retryBenchmark: recoveryPlan.retryBenchmark,
+        fromHost: currentHost,
+        host: "",
+        recoveryCount: state.recoveryCount
+      };
+    }
+
+    state.autoHost = next.host;
+    const switchedAt = Date.now();
+    await saveConfig({
+      autoBestHost: next.host,
+      autoBestAt: switchedAt,
+      autoBestSchema: BENCHMARK_SCHEMA
+    });
+    await applyRule(tabId);
     state.recoveryCount += 1;
     state.lastRecovery = {
-      at: fallbackAt,
+      at: switchedAt,
       fromHost: currentHost,
-      host: "",
-      fallback: "origin"
+      host: next.host,
+      mbps: next.mbps,
+      stage: next.stage || "sustained"
     };
     appendEvent(tabId, {
-      kind: "stall-fallback",
-      host: currentHost,
-      atSecond: Number(details.currentTime) || 0
+      kind: "stall-switch",
+      fromHost: currentHost,
+      host: next.host,
+      mbps: next.mbps
     });
     await pushDiagnostics(tabId);
     return {
       switched: true,
-      fallback: "origin",
-      retryBenchmark: recoveryPlan.retryBenchmark,
       fromHost: currentHost,
-      host: "",
+      host: next.host,
       recoveryCount: state.recoveryCount
     };
+  } finally {
+    state.recoveryInFlight = false;
   }
-
-  state.autoHost = next.host;
-  const switchedAt = Date.now();
-  await saveConfig({
-    autoBestHost: next.host,
-    autoBestAt: switchedAt,
-    autoBestSchema: BENCHMARK_SCHEMA
-  });
-  await applyRule(tabId);
-  state.recoveryCount += 1;
-  state.lastRecovery = {
-    at: switchedAt,
-    fromHost: currentHost,
-    host: next.host,
-    mbps: next.mbps,
-    stage: next.stage || "sustained"
-  };
-  appendEvent(tabId, {
-    kind: "stall-switch",
-    fromHost: currentHost,
-    host: next.host,
-    mbps: next.mbps
-  });
-  await pushDiagnostics(tabId);
-  return {
-    switched: true,
-    fromHost: currentHost,
-    host: next.host,
-    recoveryCount: state.recoveryCount
-  };
 }
 
 async function publicState(tabId, pageUrl = "") {
