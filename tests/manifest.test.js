@@ -8,7 +8,7 @@ const manifest = JSON.parse(
 
 test("manifest 使用 MV3 且默认没有代理权限", () => {
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.8.0");
+  assert.equal(manifest.version, "1.8.4");
   assert.equal("version_name" in manifest, false);
   assert.equal(manifest.permissions.includes("proxy"), false);
   assert.equal(manifest.permissions.includes("webRequestBlocking"), false);
@@ -22,6 +22,16 @@ test("manifest 使用 MV3 且默认没有代理权限", () => {
     manifest.permissions.includes("declarativeNetRequest"),
     false
   );
+});
+
+test("缓冲健康检查在内容脚本前加载", () => {
+  const isolatedWorld = manifest.content_scripts.find(
+    (script) => script.world !== "MAIN"
+  );
+  assert.deepEqual(isolatedWorld.js, [
+    "src/playback-health.js",
+    "src/content.js"
+  ]);
 });
 
 test("扩展与商店图标路径完整", async () => {

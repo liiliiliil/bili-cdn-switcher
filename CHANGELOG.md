@@ -6,6 +6,33 @@ All notable changes to this project are documented here.
 
 Nothing yet.
 
+## [1.8.4] - 2026-07-27
+
+- Add a seven-second grace period between recoveries after changing CDN hosts,
+  while retaining the 15-second cooldown for repeated reports on the same host.
+- Serialize per-tab recovery requests in the service worker so concurrent
+  player events cannot switch several hosts before content-script timers settle.
+- Prevent one seek or unresolved MediaSource wait from rapidly marking each
+  newly selected host as stalled before its first requests can settle.
+
+## [1.8.2] - 2026-07-27
+
+- Scope the 15-second recovery cooldown to the same CDN host instead of
+  making every newly selected host inherit the previous node's wait.
+- Confirm explicit `waiting` and `stalled` events after 2.5 seconds while
+  retaining the more conservative 4.5-second checks for play and seeking.
+- Keep trend prediction, pause/background resets and the recent-host
+  avoidance rules unchanged.
+
+## [1.8.1] - 2026-07-26
+
+- Add a conservative forward-buffer trend check that can switch away from a
+  failing CDN before playback fully stalls.
+- Require low buffer, a sustained eight-second decline and no recent refill;
+  reset the trend on pause, backgrounding or seeking to avoid false switches.
+- Keep the existing confirmed-stall recovery as a fallback and retain its
+  15-second cooldown.
+
 ## [1.8.0] - 2026-07-25
 
 - Keep disabled CDN hosts, labels and historical benchmark results visible
@@ -56,7 +83,10 @@ Nothing yet.
 
 - Added two-stage Range benchmarking, bounded dynamic host learning and playback-stall recovery.
 
-[Unreleased]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.8.4...HEAD
+[1.8.4]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.8.2...v1.8.4
+[1.8.2]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.8.1...v1.8.2
+[1.8.1]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/liiliiliil/bili-cdn-switcher/compare/v1.6.0...v1.7.0

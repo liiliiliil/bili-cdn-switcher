@@ -26,6 +26,54 @@ test("恢复 seek 落在冷却期内时会预约下一次卡顿复查", () => {
   );
 });
 
+test("明确卡顿更快确认，新 host 使用较短保护期", () => {
+  assert.match(contentScript, /urgentStallConfirmMs = 2500/);
+  assert.match(contentScript, /hostSwitchGraceMs = 7000/);
+  assert.match(
+    contentScript,
+    /scheduleStallCheck\(event\.target, urgentStallConfirmMs\)/
+  );
+  assert.match(
+    contentScript,
+    /recoveryCooldownRemaining\?\.\(\{/
+  );
+  assert.match(contentScript, /currentHost,\s*lastHost: lastStallHost/);
+  assert.match(
+    contentScript,
+    /minimumIntervalMs: hostSwitchGraceMs/
+  );
+  assert.match(
+    contentScript,
+    /scheduleStallCheck\(video, retryAfterMs\)/
+  );
+  assert.match(
+    serviceWorker,
+    /MIN_RECOVERY_SWITCH_INTERVAL_MS = 7 \* 1000/
+  );
+  assert.match(serviceWorker, /state\.recoveryInFlight = true/);
+  assert.match(
+    serviceWorker,
+    /reason: "cooldown",\s*retryAfterMs:/
+  );
+});
+
+test("缓冲持续下降时会在耗尽前请求恢复", () => {
+  assert.match(contentScript, /healthSampleIntervalMs = 2000/);
+  assert.match(contentScript, /preemptiveConfirmMs = 1500/);
+  assert.match(
+    contentScript,
+    /playbackHealth\.shouldPreemptivelyRecover\(healthSamples\)/
+  );
+  assert.match(
+    contentScript,
+    /requestStallRecovery\(video, "buffer-draining"\)/
+  );
+  assert.match(
+    contentScript,
+    /\["seeking", "pause", "ended"\]/
+  );
+});
+
 test("播放接口观察器区分视频轨和音频轨测速样本", () => {
   assert.match(pageHook, /videoUrls: videoOutput/);
   assert.match(pageHook, /audioUrls: audioOutput/);
